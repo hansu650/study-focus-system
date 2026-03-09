@@ -1,0 +1,414 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Study Focus Desktop MVP</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <div class="ambient ambient-left"></div>
+    <div class="ambient ambient-right"></div>
+    <div class="ambient ambient-center"></div>
+
+    <div class="page-shell">
+      <header class="topbar">
+        <div class="brand-block">
+          <p class="eyebrow">Study Focus Control Room</p>
+          <h1>Study discipline, focus rewards, and desktop guard in one control surface.</h1>
+        </div>
+
+        <div class="topbar-actions">
+          <label class="api-config">
+            <span>API Base</span>
+            <input id="api-base-input" type="text" />
+          </label>
+          <button id="save-api-base-btn" class="ghost-button" type="button">Save</button>
+          <button id="refresh-dashboard-btn" class="ghost-button" type="button" hidden>Refresh</button>
+          <button id="logout-btn" class="ghost-button" type="button" hidden>Logout</button>
+        </div>
+      </header>
+
+      <section class="hero-panel panel">
+        <div class="hero-copy-block">
+          <p class="eyebrow">Current Build</p>
+          <h2>Static web MVP first, Electron guard next, stronger focus enforcement without overengineering.</h2>
+          <p class="hero-copy">
+            Use the browser flow now. When you open this same UI inside the desktop shell, blocked app watch,
+            always-on-top focus mode, and optional blocked-site control become available.
+          </p>
+          <div class="hero-ribbon">
+            <span class="ribbon-chip">Local auth</span>
+            <span class="ribbon-chip">Focus points</span>
+            <span class="ribbon-chip">Leaderboard</span>
+            <span class="ribbon-chip">AI study break</span>
+            <span class="ribbon-chip">Redeem workflow</span>
+          </div>
+        </div>
+
+        <div class="hero-status">
+          <div class="metric-card">
+            <span class="metric-label">Session Mode</span>
+            <strong id="hero-auth-state">Guest</strong>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Current Timer</span>
+            <strong id="hero-timer-state">Idle</strong>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Redeem State</span>
+            <strong id="hero-redeem-state">Waiting</strong>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Desktop Guard</span>
+            <strong id="hero-guard-state">Browser Only</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="setup-strip panel">
+        <div>
+          <p class="eyebrow">Quick Test Route</p>
+          <h3>Register once, then login with the same username and password.</h3>
+          <p class="setup-copy">
+            Seeded dictionary values are already available. Use Region ID 1, School ID 1, and College ID 1 for local tests.
+          </p>
+        </div>
+
+        <div class="setup-actions">
+          <button id="fill-register-demo-btn" class="primary-button" type="button">Fill Register Demo</button>
+          <button id="fill-login-demo-btn" class="ghost-button" type="button">Fill Login Demo</button>
+          <p id="quick-start-hint" class="setup-hint">Click the buttons to auto-fill a safe local demo account.</p>
+        </div>
+      </section>
+
+      <section id="auth-panel" class="auth-grid">
+        <article class="panel auth-card">
+          <div class="panel-head">
+            <p class="eyebrow">Sign In</p>
+            <h3>Resume your study dashboard</h3>
+          </div>
+
+          <form id="login-form" class="stack-form">
+            <label>
+              <span>Username</span>
+              <input name="username" type="text" placeholder="demo_user_1001" required />
+            </label>
+
+            <label>
+              <span>Password</span>
+              <input name="password" type="password" placeholder="Test123456" required />
+            </label>
+
+            <button class="primary-button" type="submit">Login</button>
+          </form>
+        </article>
+
+        <article class="panel auth-card">
+          <div class="panel-head">
+            <p class="eyebrow">Register</p>
+            <h3>Create a local demo account</h3>
+          </div>
+
+          <form id="register-form" class="stack-form dense-grid">
+            <label>
+              <span>Username</span>
+              <input name="username" type="text" required />
+            </label>
+
+            <label>
+              <span>Password</span>
+              <input name="password" type="password" value="Test123456" required />
+            </label>
+
+            <label>
+              <span>Nickname</span>
+              <input name="nickname" type="text" required />
+            </label>
+
+            <label>
+              <span>Email</span>
+              <input name="email" type="email" required />
+            </label>
+
+            <label>
+              <span>Phone</span>
+              <input name="phone" type="text" required />
+            </label>
+
+            <label>
+              <span>Student No</span>
+              <input name="student_no" type="text" required />
+            </label>
+
+            <label>
+              <span>Grade Year</span>
+              <input name="grade_year" type="number" value="2026" required />
+            </label>
+
+            <label>
+              <span>Major</span>
+              <input name="major_name" type="text" value="Software Engineering" required />
+            </label>
+
+            <label>
+              <span>Region ID</span>
+              <input name="region_id" type="number" value="1" required />
+            </label>
+
+            <label>
+              <span>School ID</span>
+              <input name="school_id" type="number" value="1" required />
+            </label>
+
+            <label>
+              <span>College ID</span>
+              <input name="college_id" type="number" value="1" required />
+            </label>
+
+            <button class="primary-button wide-button" type="submit">Register</button>
+          </form>
+        </article>
+      </section>
+
+      <main id="dashboard" class="dashboard" hidden>
+        <section class="overview-grid">
+          <article class="panel profile-panel accent-panel">
+            <div class="panel-head">
+              <p class="eyebrow">Profile</p>
+              <h3 id="profile-name">Anonymous</h3>
+            </div>
+            <div class="profile-meta">
+              <div>
+                <span class="meta-label">Username</span>
+                <strong id="profile-username">-</strong>
+              </div>
+              <div>
+                <span class="meta-label">School</span>
+                <strong id="profile-school">-</strong>
+              </div>
+              <div>
+                <span class="meta-label">College</span>
+                <strong id="profile-college">-</strong>
+              </div>
+            </div>
+          </article>
+
+          <article class="panel stat-panel">
+            <span class="meta-label">Points</span>
+            <strong id="points-balance">0</strong>
+            <p id="points-note">Waiting for first settled session.</p>
+          </article>
+
+          <article class="panel stat-panel">
+            <span class="meta-label">Focus Minutes</span>
+            <strong id="focus-minutes-total">0</strong>
+            <p id="focus-note">No completed focus block yet.</p>
+          </article>
+
+          <article class="panel stat-panel timer-panel">
+            <span class="meta-label">Live Countdown</span>
+            <strong id="focus-live-timer">00:00:00</strong>
+            <p id="focus-live-status">No running session.</p>
+          </article>
+
+          <article class="panel stat-panel guard-panel">
+            <span class="meta-label">Guard Mode</span>
+            <strong id="desktop-guard-state">Browser Only</strong>
+            <p id="desktop-guard-note">Open this page inside Electron to enable desktop guard.</p>
+          </article>
+        </section>
+
+        <section class="feature-grid">
+          <article class="panel feature-panel focus-panel">
+            <div class="panel-head">
+              <p class="eyebrow">Focus Control</p>
+              <h3>Start a session, enforce discipline, and recover cleanly on violations</h3>
+            </div>
+
+            <form id="focus-start-form" class="stack-form focus-form">
+              <label>
+                <span>Planned Minutes</span>
+                <input name="planned_minutes" type="number" value="25" min="1" max="240" required />
+              </label>
+
+              <label>
+                <span>Lock Mode</span>
+                <select name="lock_mode">
+                  <option value="APP_BLOCK">APP_BLOCK</option>
+                  <option value="WEB_BLOCK">WEB_BLOCK</option>
+                  <option value="FULL_LOCK">FULL_LOCK</option>
+                  <option value="NONE">NONE</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Blocked Apps</span>
+                <input name="blocked_apps" type="text" placeholder="steam.exe, qqmusic.exe, wechat.exe" />
+              </label>
+
+              <label>
+                <span>Blocked Sites</span>
+                <input name="blocked_sites" type="text" placeholder="youtube.com, bilibili.com, douyin.com" />
+              </label>
+
+              <button class="primary-button" type="submit">Start Focus Session</button>
+            </form>
+
+            <div class="session-actions">
+              <button id="complete-session-btn" class="primary-button secondary-tone" type="button">Complete Session</button>
+              <button id="interrupt-session-btn" class="ghost-button warning-tone" type="button">Interrupt</button>
+              <button id="abandon-session-btn" class="ghost-button danger-tone" type="button">Abandon</button>
+            </div>
+
+            <div class="running-session-box">
+              <span class="meta-label">Current Session</span>
+              <div id="running-session-summary">No running session.</div>
+            </div>
+
+            <div class="desktop-guard-box">
+              <div class="question-header">
+                <div>
+                  <span class="pill">Desktop Guard</span>
+                  <span class="pill soft-pill">Medium Strength</span>
+                </div>
+              </div>
+              <div id="guard-support-badges" class="support-badges"></div>
+              <div class="table-card compact-table guard-log-card">
+                <div class="table-header">
+                  <h4>Guard Event Log</h4>
+                </div>
+                <div id="guard-event-list" class="table-list empty-state">No guard events yet.</div>
+              </div>
+            </div>
+
+            <div class="table-card">
+              <div class="table-header">
+                <h4>Recent Sessions</h4>
+              </div>
+              <div id="session-list" class="table-list empty-state">No sessions loaded.</div>
+            </div>
+          </article>
+
+          <article class="panel feature-panel">
+            <div class="panel-head">
+              <p class="eyebrow">Learning</p>
+              <h3>Daily question and AI break assistant</h3>
+            </div>
+
+            <div class="question-card">
+              <div class="question-header">
+                <div>
+                  <span id="daily-question-subject" class="pill">Subject</span>
+                  <span id="daily-question-difficulty" class="pill soft-pill">Difficulty</span>
+                </div>
+                <button id="refresh-question-btn" class="ghost-button" type="button">Refresh Question</button>
+              </div>
+              <h4 id="daily-question-title">No question loaded.</h4>
+              <p id="daily-question-body">Start by logging in and loading dashboard data.</p>
+              <p id="daily-question-hint" class="hint-text">Hint will appear here.</p>
+            </div>
+
+            <div class="chat-box">
+              <div id="chat-history" class="chat-history">
+                <div class="chat-bubble assistant-bubble">
+                  AI replies will appear here after you configure the provider key.
+                </div>
+              </div>
+
+              <form id="ai-chat-form" class="chat-form">
+                <textarea name="question" rows="4" placeholder="Ask a study question during your break." required></textarea>
+                <button class="primary-button" type="submit">Ask AI</button>
+              </form>
+            </div>
+          </article>
+        </section>
+
+        <section class="feature-grid lower-grid">
+          <article class="panel feature-panel">
+            <div class="panel-head">
+              <p class="eyebrow">Points And Ranking</p>
+              <h3>Track reward flow and compare within your school</h3>
+            </div>
+
+            <div class="panel-tabs">
+              <button class="tab-button is-active" data-period="day" type="button">Day</button>
+              <button class="tab-button" data-period="month" type="button">Month</button>
+              <button class="tab-button" data-period="year" type="button">Year</button>
+            </div>
+
+            <div class="table-card compact-table">
+              <div class="table-header">
+                <h4>Point Ledger</h4>
+              </div>
+              <div id="ledger-list" class="table-list empty-state">No ledger items yet.</div>
+            </div>
+
+            <div class="table-card compact-table">
+              <div class="table-header">
+                <h4>Leaderboard</h4>
+              </div>
+              <div id="leaderboard-list" class="table-list empty-state">No ranking data yet.</div>
+            </div>
+          </article>
+
+          <article class="panel feature-panel redeem-panel">
+            <div class="panel-head">
+              <p class="eyebrow">Redeem And Verify</p>
+              <h3>Convert points into print quota and simulate store scan</h3>
+            </div>
+
+            <form id="redeem-form" class="stack-form">
+              <label>
+                <span>Store Name</span>
+                <input name="store_name" type="text" value="Campus Print Shop A" required />
+              </label>
+
+              <label>
+                <span>Points Cost</span>
+                <input name="points_cost" type="number" value="10" min="1" required />
+              </label>
+
+              <label>
+                <span>Print Pages</span>
+                <input name="print_quota_pages" type="number" value="5" min="1" required />
+              </label>
+
+              <label>
+                <span>Expire Minutes</span>
+                <input name="expire_minutes" type="number" value="120" min="10" required />
+              </label>
+
+              <button class="primary-button" type="submit">Create Redeem Order</button>
+            </form>
+
+            <form id="verify-form" class="stack-form verify-form">
+              <label>
+                <span>Coupon Token</span>
+                <input name="coupon_token" type="text" placeholder="Paste token to verify" required />
+              </label>
+
+              <label>
+                <span>Verifier ID</span>
+                <input name="verifier_id" type="text" value="store-owner-001" required />
+              </label>
+
+              <button class="ghost-button secondary-tone" type="submit">Verify Coupon</button>
+            </form>
+
+            <div class="table-card">
+              <div class="table-header">
+                <h4>Redeem Orders</h4>
+              </div>
+              <div id="redeem-list" class="table-list empty-state">No redeem orders yet.</div>
+            </div>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>

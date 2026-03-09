@@ -1,0 +1,19 @@
+﻿[Unit]
+Description=Study Focus FastAPI Service
+After=network.target
+
+[Service]
+Type=simple
+# Update to your backend project directory
+WorkingDirectory=/opt/study-focus/backend
+# Update to your .env path
+EnvironmentFile=/opt/study-focus/backend/.env
+# If using conda, replace with the uvicorn path inside that conda env
+ExecStart=/usr/bin/env uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+User=www-data
+Group=www-data
+
+[Install]
+WantedBy=multi-user.target

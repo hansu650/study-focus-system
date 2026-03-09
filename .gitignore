@@ -1,0 +1,28 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# IDE/OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Runtime
+.tmp/
+
+# Node
+node_modules/
+.npm-cache/
+desktop/node_modules/
+desktop/.npm-cache/

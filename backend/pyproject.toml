@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "study-focus-backend"
+version = "0.1.0"
+description = "Backend service for study focus and incentive platform"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Study Focus Team" }]
+dependencies = [
+  "fastapi==0.115.6",
+  "uvicorn[standard]==0.34.0",
+  "sqlalchemy==2.0.37",
+  "pymysql==1.1.1",
+  "pydantic-settings==2.7.1",
+  "python-jose[cryptography]==3.3.0",
+  "passlib[bcrypt]==1.7.4",
+  "bcrypt==4.0.1",
+  "python-multipart==0.0.20",
+  "email-validator==2.2.0"
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+

@@ -1,0 +1,14 @@
+﻿{
+  "name": "study-focus-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Electron shell for Study Focus with medium-strength anti-distraction guard.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "check": "node --check main.js && node --check preload.js && node --check guard/focusGuard.js"
+  },
+  "devDependencies": {
+    "electron": "^35.3.0"
+  }
+}
