@@ -1,7 +1,5 @@
 ﻿# Frontend MVP
 
-## Path
-`D:\daima\cursor\合作项目\frontend`
 
 ## Stack
 1. Static HTML
