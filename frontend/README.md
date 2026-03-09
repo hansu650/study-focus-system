@@ -26,8 +26,8 @@ The next stage can migrate it to Vue 3 + Electron after the interaction flow is 
 Open a new `cmd` window and run:
 
 ```bat
-cd /d D:\daima\cursor\合作项目\backend
-call D:\kaifagongju\Anaconda\Scripts\activate.bat study_focus_backend
+cd 
+call 
 
 set AI_PROVIDER=anthropic_compatible
 set AI_API_BASE=https://api-inference.modelscope.cn
@@ -45,8 +45,8 @@ Backend docs:
 Open another `cmd` window and run:
 
 ```bat
-cd /d D:\daima\cursor\合作项目\frontend
-call D:\kaifagongju\Anaconda\Scripts\activate.bat study_focus_backend
+cd 
+call 
 python -m http.server 5173
 ```
 
