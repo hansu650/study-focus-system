@@ -1,8 +1,8 @@
-﻿"""Redeem order endpoints."""
+"""Redeem order endpoints."""
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -83,12 +83,22 @@ def get_my_redeem_order(
 def verify_redeem_order(
     payload: RedeemOrderVerifyRequest,
     db: Annotated[Session, Depends(get_db)],
-    _: Annotated[AppUser, Depends(get_current_user)],
+    current_user: Annotated[AppUser, Depends(get_current_user)],
+    merchant_token: Annotated[str | None, Header(alias="X-Merchant-Token")] = None,
 ) -> RedeemOrderOut:
     """Verify redeem order using coupon token (store scan simulation)."""
 
     try:
-        order = RedeemService.verify_order_by_token(db, payload)
+        order = RedeemService.verify_order_by_token(
+            db=db,
+            current_user=current_user,
+            payload=payload,
+            merchant_token=merchant_token,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 

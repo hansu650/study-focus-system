@@ -1,4 +1,4 @@
-﻿"""Leaderboard endpoints."""
+"""Leaderboard endpoints."""
 
 from datetime import date
 from typing import Annotated
@@ -22,9 +22,11 @@ def get_focus_leaderboard(
     period: Annotated[LeaderboardPeriod, Query()] = LeaderboardPeriod.DAY,
     scope: Annotated[LeaderboardScope, Query()] = LeaderboardScope.SCHOOL,
     target_date: Annotated[date | None, Query(description="Reference date, default: today")] = None,
+    school_id: Annotated[int | None, Query(description="Optional school filter for school or college scope")] = None,
+    college_id: Annotated[int | None, Query(description="Optional college filter for college scope")] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> FocusLeaderboardOut:
-    """Get focus leaderboard for school or college scope."""
+    """Get focus leaderboard for college, school, or cross-school scope."""
 
     return LeaderboardService.get_focus_leaderboard(
         db=db,
@@ -32,5 +34,7 @@ def get_focus_leaderboard(
         period=period,
         scope=scope,
         target_date=target_date,
+        school_id=school_id,
+        college_id=college_id,
         limit=limit,
     )

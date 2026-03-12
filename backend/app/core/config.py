@@ -1,4 +1,4 @@
-﻿"""Project settings module.
+"""Project settings module.
 
 This module loads environment variables and exposes derived values such as
 Database URL and CORS origin list.
@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     ai_api_key: str = Field(default="", alias="AI_API_KEY")
     anthropic_auth_token: str = Field(default="", alias="ANTHROPIC_AUTH_TOKEN")
     ai_model: str = Field(default="gpt-4o-mini", alias="AI_MODEL")
+
+    # Merchant verification settings
+    redeem_verify_token: str = Field(default="", alias="REDEEM_VERIFY_TOKEN")
 
     @property
     def database_url(self) -> str:

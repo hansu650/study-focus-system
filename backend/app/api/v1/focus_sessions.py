@@ -1,4 +1,4 @@
-﻿"""Focus session endpoints."""
+"""Focus session endpoints."""
 
 from datetime import date
 from typing import Annotated
@@ -66,6 +66,22 @@ def interrupt_focus_session(
 
     try:
         session = FocusService.interrupt_session(db, current_user, session_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    return FocusSessionOut.model_validate(session)
+
+
+@router.post("/{session_id}/resume", response_model=FocusSessionOut)
+def resume_focus_session(
+    session_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[AppUser, Depends(get_current_user)],
+) -> FocusSessionOut:
+    """Resume an interrupted focus session."""
+
+    try:
+        session = FocusService.resume_session(db, current_user, session_id)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 

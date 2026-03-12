@@ -1,8 +1,6 @@
--- Minimal seed data for local API testing
--- Run after db/schema.sql
-
-SET NAMES utf8mb4;
+-- Incremental demo dictionary data for leaderboard presentation
 USE study_focus;
+SET NAMES utf8mb4;
 
 INSERT INTO dict_region (
   region_id, region_code, region_name, region_level, parent_region_id, sort_no, is_enabled
@@ -32,4 +30,5 @@ INSERT INTO dict_college (
   (4, 2, 'WUST-MATERIALS', 'School of Materials and Metallurgy', 1)
 ON DUPLICATE KEY UPDATE
   college_name = VALUES(college_name),
-  school_id = VALUES(school_id);
+  school_id = VALUES(school_id),
+  is_enabled = VALUES(is_enabled);

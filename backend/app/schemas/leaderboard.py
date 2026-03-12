@@ -1,4 +1,4 @@
-﻿"""Leaderboard schemas."""
+"""Leaderboard schemas."""
 
 from datetime import date
 from enum import Enum
@@ -19,6 +19,7 @@ class LeaderboardScope(str, Enum):
 
     SCHOOL = "school"
     COLLEGE = "college"
+    GLOBAL = "global"
 
 
 class LeaderboardItemOut(BaseModel):
@@ -30,6 +31,10 @@ class LeaderboardItemOut(BaseModel):
     nickname: str
     total_points: int
     total_focus_minutes: int
+    school_id: int
+    school_name: str | None = None
+    college_id: int
+    college_name: str | None = None
 
 
 class FocusLeaderboardOut(BaseModel):
@@ -39,4 +44,8 @@ class FocusLeaderboardOut(BaseModel):
     scope: LeaderboardScope
     date_start: date
     date_end: date
+    selected_school_id: int | None = None
+    selected_school_name: str | None = None
+    selected_college_id: int | None = None
+    selected_college_name: str | None = None
     items: list[LeaderboardItemOut]

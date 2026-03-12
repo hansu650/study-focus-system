@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   --canvas: #ede3d4;
   --canvas-deep: #e4d3bc;
   --panel: rgba(251, 247, 241, 0.78);
@@ -224,7 +224,6 @@ textarea {
 .question-card,
 .chat-history,
 .chat-form,
-.verify-form,
 .desktop-guard-box,
 .table-card {
   background: var(--panel-strong);
@@ -298,6 +297,11 @@ textarea {
   gap: 1rem;
 }
 
+.lower-grid {
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.05fr) minmax(0, 0.9fr);
+  align-items: start;
+}
+
 .dashboard {
   display: grid;
   gap: 1rem;
@@ -317,6 +321,10 @@ textarea {
 
 .stack-form textarea {
   resize: vertical;
+}
+
+.feedback-form textarea {
+  min-height: 10rem;
 }
 
 .dense-grid,
@@ -432,8 +440,8 @@ textarea {
 .running-session-box,
 .question-card,
 .chat-form,
-.verify-form,
-.desktop-guard-box {
+.desktop-guard-box,
+.coupon-highlight-box {
   padding: 1rem;
   border-radius: var(--radius-lg);
 }
@@ -494,6 +502,170 @@ textarea {
 .chat-box {
   display: grid;
   gap: 0.9rem;
+}
+
+.leaderboard-filter-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.85rem;
+}
+
+.leaderboard-filter-bar label {
+  display: grid;
+  gap: 0.38rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.leaderboard-context {
+  margin: -0.2rem 0 0;
+  color: var(--accent-deep);
+  font-size: 0.94rem;
+}
+
+.scope-tabs {
+  margin-top: -0.3rem;
+}
+
+.leaderboard-card {
+  background: linear-gradient(180deg, rgba(255, 252, 247, 0.98) 0%, rgba(246, 239, 229, 0.98) 100%);
+}
+
+.leaderboard-card .table-list {
+  gap: 0.85rem;
+  padding: 0.95rem;
+}
+
+.leaderboard-card .table-row {
+  border-top: none;
+}
+
+.leaderboard-entry {
+  gap: 0.8rem;
+  padding: 1rem;
+  border-radius: 1.15rem;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 12px 24px rgba(62, 49, 29, 0.08);
+}
+
+.leaderboard-entry.is-gold {
+  background: linear-gradient(135deg, rgba(252, 242, 205, 0.98) 0%, rgba(255, 252, 243, 0.98) 100%);
+  border: 1px solid rgba(201, 158, 54, 0.28);
+}
+
+.leaderboard-entry.is-silver {
+  background: linear-gradient(135deg, rgba(233, 239, 241, 0.98) 0%, rgba(255, 255, 255, 0.98) 100%);
+  border: 1px solid rgba(128, 144, 150, 0.2);
+}
+
+.leaderboard-entry.is-bronze {
+  background: linear-gradient(135deg, rgba(243, 226, 210, 0.98) 0%, rgba(255, 251, 247, 0.98) 100%);
+  border: 1px solid rgba(170, 108, 72, 0.2);
+}
+
+.leaderboard-entry-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.85rem;
+  align-items: center;
+}
+
+.leaderboard-rank-block {
+  display: grid;
+  justify-items: center;
+  gap: 0.3rem;
+}
+
+.leaderboard-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-weight: 700;
+}
+
+.leaderboard-medal {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.leaderboard-identity {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.leaderboard-handle {
+  color: var(--muted);
+  font-size: 0.94rem;
+}
+
+.leaderboard-points {
+  display: grid;
+  justify-items: end;
+  gap: 0.08rem;
+}
+
+.leaderboard-points strong {
+  font-size: 1.65rem;
+  line-height: 1;
+}
+
+.leaderboard-points span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.leaderboard-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.leaderboard-stat-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0.35rem 0.72rem;
+  border-radius: 999px;
+  background: rgba(15, 139, 109, 0.12);
+  color: var(--accent-deep);
+  font-size: 0.84rem;
+}
+
+.leaderboard-stat-pill.is-soft {
+  background: rgba(28, 41, 36, 0.06);
+  color: var(--muted);
+}
+
+.leaderboard-campus {
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.coupon-highlight-box {
+  display: grid;
+  gap: 0.55rem;
+  background: linear-gradient(135deg, rgba(15, 139, 109, 0.14) 0%, rgba(255, 255, 255, 0.92) 80%);
+  border: 1px solid rgba(15, 139, 109, 0.14);
+}
+
+.coupon-highlight-box strong {
+  font-size: 1.15rem;
+  word-break: break-all;
+}
+
+.coupon-token {
+  font-family: Consolas, "Courier New", monospace;
+  letter-spacing: 0.02em;
 }
 
 .chat-history {
@@ -641,7 +813,8 @@ textarea {
   .dense-grid,
   .focus-form,
   .profile-meta,
-  .hero-status {
+  .hero-status,
+  .leaderboard-filter-bar {
     grid-template-columns: 1fr 1fr;
   }
 
@@ -681,8 +854,18 @@ textarea {
   .focus-form,
   .profile-meta,
   .hero-status,
-  .overview-grid {
+  .overview-grid,
+  .leaderboard-filter-bar {
     grid-template-columns: 1fr;
+  }
+
+  .leaderboard-entry-head {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .leaderboard-points {
+    justify-items: start;
   }
 
   .chat-bubble {

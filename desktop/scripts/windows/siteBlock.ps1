@@ -1,4 +1,4 @@
-﻿param(
+param(
   [ValidateSet("Apply", "Clear")]
   [string]$Mode = "Apply",
   [string]$DomainsCsv = ""
@@ -7,6 +7,12 @@
 $hostsPath = Join-Path $env:SystemRoot "System32\drivers\etc\hosts"
 $startMarker = "# STUDY_FOCUS_BLOCK_START"
 $endMarker = "# STUDY_FOCUS_BLOCK_END"
+
+function Test-IsAdministrator {
+  $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+  $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+  return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
 
 function Remove-ManagedBlock {
   param([string[]]$Content)
@@ -39,6 +45,21 @@ function Normalize-Domain {
   return ($Value.Trim().ToLower() -replace "^https?://", "" -replace "^www\\.", "" -replace "/.*$", "")
 }
 
+function Write-HostsContent {
+  param(
+    [string]$Path,
+    [string[]]$Lines
+  )
+
+  $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+  [System.IO.File]::WriteAllLines($Path, $Lines, $utf8NoBom)
+}
+
+if (-not (Test-IsAdministrator)) {
+  Write-Error "Administrator permission is required to modify the Windows hosts file."
+  exit 1
+}
+
 $content = @()
 if (Test-Path $hostsPath) {
   $content = Get-Content -Path $hostsPath -Encoding utf8
@@ -69,6 +90,12 @@ if ($Mode -eq "Apply" -and -not [string]::IsNullOrWhiteSpace($DomainsCsv)) {
   }
 }
 
-Set-Content -Path $hostsPath -Value $filtered -Encoding utf8
-ipconfig /flushdns | Out-Null
+try {
+  Write-HostsContent -Path $hostsPath -Lines $filtered
+  ipconfig /flushdns | Out-Null
+} catch {
+  Write-Error ("Failed to update the Windows hosts file: " + $_.Exception.Message)
+  exit 1
+}
+
 Write-Output ("SITE_BLOCK_" + $Mode.ToUpper())

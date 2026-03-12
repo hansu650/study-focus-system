@@ -1,10 +1,11 @@
-﻿"""Leaderboard query service."""
+"""Leaderboard query service."""
 
 from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
+from app.db.models.dicts import DictCollege, DictSchool
 from app.db.models.focus import FocusSession
 from app.db.models.user import AppUser
 from app.schemas.leaderboard import (
@@ -26,12 +27,17 @@ class LeaderboardService:
         scope: LeaderboardScope,
         target_date: date | None,
         limit: int,
+        school_id: int | None = None,
+        college_id: int | None = None,
     ) -> FocusLeaderboardOut:
         """Build focus leaderboard for selected period and scope."""
 
         date_start, date_end = LeaderboardService._resolve_date_range(period, target_date)
         dt_start = datetime.combine(date_start, time.min)
         dt_end_exclusive = datetime.combine(date_end + timedelta(days=1), time.min)
+
+        selected_school_id = school_id or current_user.school_id
+        selected_college_id = college_id or current_user.college_id
 
         points_sum = func.coalesce(func.sum(FocusSession.awarded_points), 0).label("total_points")
         minutes_sum = func.coalesce(func.sum(FocusSession.actual_minutes), 0).label("total_focus_minutes")
@@ -41,10 +47,16 @@ class LeaderboardService:
                 AppUser.user_id.label("user_id"),
                 AppUser.username.label("username"),
                 AppUser.nickname.label("nickname"),
+                AppUser.school_id.label("school_id"),
+                DictSchool.school_name.label("school_name"),
+                AppUser.college_id.label("college_id"),
+                DictCollege.college_name.label("college_name"),
                 points_sum,
                 minutes_sum,
             )
             .join(FocusSession, FocusSession.user_id == AppUser.user_id)
+            .join(DictSchool, DictSchool.school_id == AppUser.school_id)
+            .join(DictCollege, DictCollege.college_id == AppUser.college_id)
             .where(
                 and_(
                     FocusSession.status == "COMPLETED",
@@ -55,13 +67,35 @@ class LeaderboardService:
             )
         )
 
+        selected_school_name = None
+        selected_college_name = None
+
         if scope == LeaderboardScope.SCHOOL:
-            stmt = stmt.where(AppUser.school_id == current_user.school_id)
+            stmt = stmt.where(AppUser.school_id == selected_school_id)
+            selected_school_name = LeaderboardService._get_school_name(db, selected_school_id)
+        elif scope == LeaderboardScope.COLLEGE:
+            stmt = stmt.where(
+                and_(
+                    AppUser.school_id == selected_school_id,
+                    AppUser.college_id == selected_college_id,
+                )
+            )
+            selected_school_name = LeaderboardService._get_school_name(db, selected_school_id)
+            selected_college_name = LeaderboardService._get_college_name(db, selected_college_id)
         else:
-            stmt = stmt.where(AppUser.college_id == current_user.college_id)
+            selected_school_id = None
+            selected_college_id = None
 
         rows = db.execute(
-            stmt.group_by(AppUser.user_id, AppUser.username, AppUser.nickname)
+            stmt.group_by(
+                AppUser.user_id,
+                AppUser.username,
+                AppUser.nickname,
+                AppUser.school_id,
+                DictSchool.school_name,
+                AppUser.college_id,
+                DictCollege.college_name,
+            )
             .order_by(points_sum.desc(), minutes_sum.desc(), AppUser.user_id.asc())
             .limit(limit)
         ).all()
@@ -74,6 +108,10 @@ class LeaderboardService:
                 nickname=str(row.nickname),
                 total_points=int(row.total_points),
                 total_focus_minutes=int(row.total_focus_minutes),
+                school_id=int(row.school_id),
+                school_name=str(row.school_name) if row.school_name is not None else None,
+                college_id=int(row.college_id),
+                college_name=str(row.college_name) if row.college_name is not None else None,
             )
             for index, row in enumerate(rows, start=1)
         ]
@@ -83,8 +121,26 @@ class LeaderboardService:
             scope=scope,
             date_start=date_start,
             date_end=date_end,
+            selected_school_id=selected_school_id,
+            selected_school_name=selected_school_name,
+            selected_college_id=selected_college_id if scope == LeaderboardScope.COLLEGE else None,
+            selected_college_name=selected_college_name,
             items=items,
         )
+
+    @staticmethod
+    def _get_school_name(db: Session, school_id: int | None) -> str | None:
+        if school_id is None:
+            return None
+        school = db.scalar(select(DictSchool).where(DictSchool.school_id == school_id))
+        return school.school_name if school else None
+
+    @staticmethod
+    def _get_college_name(db: Session, college_id: int | None) -> str | None:
+        if college_id is None:
+            return None
+        college = db.scalar(select(DictCollege).where(DictCollege.college_id == college_id))
+        return college.college_name if college else None
 
     @staticmethod
     def _resolve_date_range(period: LeaderboardPeriod, target_date: date | None) -> tuple[date, date]:

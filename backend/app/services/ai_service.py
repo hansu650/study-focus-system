@@ -1,4 +1,4 @@
-﻿"""AI provider adapter.
+"""AI provider adapter.
 
 Supports OpenAI-compatible and Anthropic-compatible providers.
 """
@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from urllib import error, request
+from http.client import HTTPConnection, HTTPException, HTTPSConnection, HTTPResponse
+from json import JSONDecodeError
+from urllib.parse import urlparse
 
 from app.core.config import settings
 
@@ -73,7 +75,7 @@ class AIService:
             endpoint=endpoint,
             payload=payload,
             headers={
-                "Content-Type": "application/json",
+                "Content-Type": "application/json; charset=utf-8",
                 "Authorization": f"Bearer {settings.resolved_ai_api_key}",
             },
         )
@@ -100,7 +102,7 @@ class AIService:
             endpoint=endpoint,
             payload=payload,
             headers={
-                "Content-Type": "application/json",
+                "Content-Type": "application/json; charset=utf-8",
                 "x-api-key": settings.resolved_ai_api_key,
                 "anthropic-version": "2023-06-01",
                 "Authorization": f"Bearer {settings.resolved_ai_api_key}",
@@ -114,24 +116,65 @@ class AIService:
 
     @staticmethod
     def _post_json(endpoint: str, payload: dict, headers: dict[str, str]) -> dict:
-        data = json.dumps(payload).encode("utf-8")
-        req = request.Request(endpoint, data=data, headers=headers, method="POST")
+        body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        connection, path = AIService._build_connection(endpoint)
+        request_headers = AIService._prepare_headers(headers, len(body))
 
         try:
-            with request.urlopen(req, timeout=30) as resp:
-                raw = resp.read().decode("utf-8")
-                return json.loads(raw)
-        except error.HTTPError as exc:
-            detail = ""
-            try:
-                detail = exc.read().decode("utf-8").strip()
-            except Exception:
-                detail = ""
+            connection.request("POST", path, body=body, headers=request_headers)
+            response = connection.getresponse()
+            raw = response.read().decode("utf-8", errors="replace")
+        except UnicodeEncodeError as exc:
+            raise RuntimeError(
+                "AI request encoding failed. Please verify the provider URL and API key format, then retry."
+            ) from exc
+        except OSError as exc:
+            raise RuntimeError(f"Failed to reach AI provider: {exc}") from exc
+        except HTTPException as exc:
+            raise RuntimeError(f"AI provider connection failed: {exc}") from exc
+        finally:
+            connection.close()
+
+        if response.status >= 400:
+            detail = raw.strip()
             if detail:
-                raise RuntimeError(f"AI provider returned HTTP {exc.code}: {detail[:400]}") from exc
-            raise RuntimeError(f"AI provider returned HTTP {exc.code}.") from exc
-        except error.URLError as exc:
-            raise RuntimeError(f"Failed to reach AI provider: {exc.reason}") from exc
+                raise RuntimeError(f"AI provider returned HTTP {response.status}: {detail[:400]}")
+            raise RuntimeError(f"AI provider returned HTTP {response.status}.")
+
+        if not raw.strip():
+            return {}
+
+        try:
+            return json.loads(raw)
+        except JSONDecodeError as exc:
+            raise RuntimeError(f"AI provider returned non-JSON response: {raw[:200]}") from exc
+
+    @staticmethod
+    def _build_connection(endpoint: str) -> tuple[HTTPConnection | HTTPSConnection, str]:
+        parsed = urlparse(endpoint)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            raise RuntimeError("AI_API_BASE must be a valid http(s) URL.")
+
+        path = parsed.path or "/"
+        if parsed.query:
+            path = f"{path}?{parsed.query}"
+
+        port = parsed.port
+        if parsed.scheme == "https":
+            return HTTPSConnection(parsed.hostname, port=port, timeout=30), path
+        return HTTPConnection(parsed.hostname, port=port, timeout=30), path
+
+    @staticmethod
+    def _prepare_headers(headers: dict[str, str], body_length: int) -> dict[str, str]:
+        cleaned: dict[str, str] = {
+            str(key): str(value).strip()
+            for key, value in headers.items()
+            if value is not None and str(value).strip()
+        }
+        cleaned.setdefault("Content-Type", "application/json; charset=utf-8")
+        cleaned.setdefault("Accept", "application/json")
+        cleaned["Content-Length"] = str(body_length)
+        return cleaned
 
     @staticmethod
     def _extract_openai_answer(body: dict) -> str:
@@ -191,4 +234,3 @@ class AIService:
         if base.endswith("/v1"):
             return f"{base}/messages"
         return f"{base}/v1/messages"
-
