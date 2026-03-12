@@ -1,6 +1,6 @@
-﻿"""Focus session service."""
+"""Focus session service."""
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
@@ -25,16 +25,13 @@ class FocusService:
     def start_session(db: Session, user: AppUser, payload: FocusSessionStartRequest) -> FocusSession:
         """Start a new focus session for the current user."""
 
-        running = db.scalar(
-            select(FocusSession).where(
-                and_(
-                    FocusSession.user_id == user.user_id,
-                    FocusSession.status == FocusSessionStatus.RUNNING.value,
-                )
-            )
-        )
+        running = FocusService._get_running_session(db, user.user_id)
         if running:
             raise ValueError("A running focus session already exists. Complete or stop it first.")
+
+        interrupted = FocusService._get_resumable_interrupted_session(db, user.user_id)
+        if interrupted:
+            raise ValueError("An interrupted focus session already exists. Resume or abandon it before starting a new one.")
 
         now = datetime.now()
         session = FocusSession(
@@ -73,8 +70,11 @@ class FocusService:
             raise ValueError("Only a running session can be completed.")
 
         now = datetime.now()
-        actual_minutes = payload.actual_minutes if payload.actual_minutes is not None else session.planned_minutes
-        actual_minutes = FocusService._normalize_actual_minutes(actual_minutes, session.planned_minutes, allow_zero=False)
+        estimated = FocusService._estimate_actual_minutes(session, now)
+        if estimated < int(session.planned_minutes):
+            raise ValueError("Focus session is still running. Wait until the timer ends or interrupt it instead.")
+
+        actual_minutes = int(session.planned_minutes)
 
         user_locked = db.scalar(
             select(AppUser).where(AppUser.user_id == user.user_id).with_for_update()
@@ -115,25 +115,55 @@ class FocusService:
         session_id: int,
         payload: FocusSessionStopRequest,
     ) -> FocusSession:
-        """Interrupt a running session without point reward."""
+        """Pause a running session and keep the elapsed time for resume."""
 
         session = FocusService._get_owned_session(db, user.user_id, session_id, for_update=True)
         if session.status != FocusSessionStatus.RUNNING.value:
             raise ValueError("Only a running session can be interrupted.")
 
         now = datetime.now()
-        estimated = FocusService._estimate_actual_minutes(session, now)
-        actual_minutes = payload.actual_minutes if payload.actual_minutes is not None else estimated
-        actual_minutes = FocusService._normalize_actual_minutes(actual_minutes, session.planned_minutes, allow_zero=True)
+        actual_minutes = FocusService._estimate_actual_minutes(session, now)
 
         session.actual_minutes = actual_minutes
         session.end_at = now
         session.status = FocusSessionStatus.INTERRUPTED.value
         session.interrupt_count = int(session.interrupt_count) + 1
         session.awarded_points = 0
-        session.settle_status = 1
+        session.settle_status = 0
         if payload.remark is not None:
             session.remark = payload.remark
+
+        db.add(session)
+        db.commit()
+        db.refresh(session)
+        return session
+
+    @staticmethod
+    def resume_session(
+        db: Session,
+        user: AppUser,
+        session_id: int,
+    ) -> FocusSession:
+        """Resume an interrupted session without clearing its elapsed time."""
+
+        session = FocusService._get_owned_session(db, user.user_id, session_id, for_update=True)
+        if session.status != FocusSessionStatus.INTERRUPTED.value or int(session.settle_status) != 0:
+            raise ValueError("Only an interrupted unfinished session can be resumed.")
+
+        running = FocusService._get_running_session(db, user.user_id, for_update=True)
+        if running and running.session_id != session.session_id:
+            raise ValueError("Another running focus session already exists.")
+
+        elapsed_delta = FocusService._resolve_saved_elapsed_delta(session)
+        now = datetime.now()
+        resumed_start = now - elapsed_delta
+
+        session.start_at = resumed_start
+        session.focus_date = resumed_start.date()
+        session.end_at = None
+        session.status = FocusSessionStatus.RUNNING.value
+        session.awarded_points = 0
+        session.settle_status = 0
 
         db.add(session)
         db.commit()
@@ -147,18 +177,15 @@ class FocusService:
         session_id: int,
         payload: FocusSessionStopRequest,
     ) -> FocusSession:
-        """Abandon a running session without point reward."""
+        """Abandon a session and clear its elapsed time without point reward."""
 
         session = FocusService._get_owned_session(db, user.user_id, session_id, for_update=True)
-        if session.status != FocusSessionStatus.RUNNING.value:
-            raise ValueError("Only a running session can be abandoned.")
+        if session.status not in {FocusSessionStatus.RUNNING.value, FocusSessionStatus.INTERRUPTED.value}:
+            raise ValueError("Only a running or interrupted session can be abandoned.")
 
         now = datetime.now()
-        estimated = FocusService._estimate_actual_minutes(session, now)
-        actual_minutes = payload.actual_minutes if payload.actual_minutes is not None else estimated
-        actual_minutes = FocusService._normalize_actual_minutes(actual_minutes, session.planned_minutes, allow_zero=True)
 
-        session.actual_minutes = actual_minutes
+        session.actual_minutes = 0
         session.end_at = now
         session.status = FocusSessionStatus.ABANDONED.value
         session.awarded_points = 0
@@ -221,10 +248,58 @@ class FocusService:
         return session
 
     @staticmethod
+    def _get_running_session(db: Session, user_id: int, for_update: bool = False) -> FocusSession | None:
+        query = select(FocusSession).where(
+            and_(
+                FocusSession.user_id == user_id,
+                FocusSession.status == FocusSessionStatus.RUNNING.value,
+            )
+        )
+        if for_update:
+            query = query.with_for_update()
+        return db.scalar(query)
+
+    @staticmethod
+    def _get_resumable_interrupted_session(db: Session, user_id: int) -> FocusSession | None:
+        query = (
+            select(FocusSession)
+            .where(
+                and_(
+                    FocusSession.user_id == user_id,
+                    FocusSession.status == FocusSessionStatus.INTERRUPTED.value,
+                    FocusSession.settle_status == 0,
+                )
+            )
+            .order_by(FocusSession.updated_at.desc(), FocusSession.session_id.desc())
+        )
+        return db.scalar(query)
+
+    @staticmethod
     def _estimate_actual_minutes(session: FocusSession, now: datetime) -> int:
-        elapsed_minutes = int((now - session.start_at).total_seconds() // 60)
-        elapsed_minutes = max(0, elapsed_minutes)
+        elapsed_delta = FocusService._estimate_elapsed_delta(session, now)
+        elapsed_minutes = int(elapsed_delta.total_seconds() // 60)
         return min(elapsed_minutes, int(session.planned_minutes))
+
+    @staticmethod
+    def _estimate_elapsed_delta(session: FocusSession, now: datetime) -> timedelta:
+        elapsed_seconds = max(0.0, (now - session.start_at).total_seconds())
+        planned_seconds = max(0, int(session.planned_minutes) * 60)
+        return timedelta(seconds=min(elapsed_seconds, planned_seconds))
+
+    @staticmethod
+    def _resolve_saved_elapsed_delta(session: FocusSession) -> timedelta:
+        planned_seconds = max(0, int(session.planned_minutes) * 60)
+
+        if session.end_at is not None:
+            elapsed_seconds = max(0.0, (session.end_at - session.start_at).total_seconds())
+            return timedelta(seconds=min(elapsed_seconds, planned_seconds))
+
+        fallback_minutes = FocusService._normalize_actual_minutes(
+            int(session.actual_minutes or 0),
+            int(session.planned_minutes),
+            allow_zero=True,
+        )
+        return timedelta(minutes=fallback_minutes)
 
     @staticmethod
     def _normalize_actual_minutes(actual_minutes: int, planned_minutes: int, allow_zero: bool) -> int:

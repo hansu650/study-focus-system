@@ -1,4 +1,4 @@
-﻿# Implementation Completion Log
+# Implementation Completion Log
 
 ## Project
 Study Focus (Desktop Pomodoro + Incentive System)
@@ -166,3 +166,174 @@ Record completed backend, frontend, and desktop-guard milestones, plus debugging
 2. Confirmed `.env` is ignored by `.gitignore`, while `backend/.env.example` keeps placeholder values for safe sharing.
 3. Confirmed this workspace is not yet initialized as a git repository.
 4. Strengthened `.gitignore` to exclude `*.egg-info/` build artifacts before GitHub upload.
+
+## Pre-GitHub Handoff Notes
+1. Current browser and desktop core flows are working.
+2. AI integration still needs another debugging pass in the user's local environment, even though earlier API validation succeeded in controlled checks.
+3. The codebase is being uploaded first so iteration can continue from GitHub with a cleaner collaboration flow.
+
+## Known Open Issues
+1. AI call path is not fully stable in the latest user-side manual test and needs follow-up debugging after repository upload.
+2. The desktop website blacklist path exists in code, but a full live validation with administrator permission is still pending.
+
+## Pending Manual Validation
+1. Browser AI chat should be retested after confirming the active ModelScope key and backend runtime environment.
+2. Website blacklist should be retested in Electron under administrator mode with sample domains such as `youtube.com` and `bilibili.com`.
+3. Process blacklist validation already passed and should be treated as the current confirmed medium-strength anti-distraction feature.
+
+## Sprint 1 Documentation Update
+1. Created and switched to the dedicated working branch `sprint1-qin-tian` for Sprint 1 document preparation.
+2. Reviewed `Something_to_write/计划.md` and limited the document scope to Sprint 1 deliverables only.
+3. Updated `12_ Project Problem Domain Activity Sheet.docx` to align the group naming with the current Sprint 1 submission set.
+4. Completed `SPRINT 1A - Retrospective Activity Sheet.docx` with Sprint 1 summary, accomplishments, and further-work notes.
+5. Completed the relevant Sprint 1 section in `Team Leader Report Template.docx` with finished work, pending work, and current schedule status.
+6. Added Sprint 1 meeting records to `Team Meeting Summary Template.docx` and kept later unused rows untouched.
+7. Confirmed the current open issues are still the AI call follow-up and the pending administrator-mode validation for website blacklist control.
+
+## Sprint 2 Kickoff Review - 2026-03-11
+1. Re-read the backend, frontend, Electron guard, schemas, and SQL structure before making Sprint 2 changes.
+2. Confirmed the architecture is still a thin static frontend + FastAPI backend + Electron desktop shell, with business logic concentrated in service-layer modules.
+3. Identified the first Sprint 2 priority as the focus settlement loophole in `backend/app/services/focus_service.py`.
+4. Confirmed that `complete_session()` had been defaulting `actual_minutes` to `planned_minutes`, which meant a user could finish immediately and still receive full points.
+5. Identified the second priority as redeem verification authorization in `backend/app/api/v1/redeem_orders.py`, because `/verify` currently requires only a logged-in user and has no merchant-role boundary yet.
+6. Confirmed the AI instability issue still matters, but it is lower priority than the focus reward integrity bug.
+7. Confirmed the desktop website blacklist path still needs clearer validation messaging and later administrator-mode live testing.
+8. Planned Sprint 2 execution order: fix focus reward integrity first, then tighten redeem verification boundaries, then improve AI stability and desktop site-block validation feedback.
+
+## Sprint 2 Update - Focus Reward Integrity Fix - 2026-03-11
+1. Updated `backend/app/services/focus_service.py` so a running session can only be completed after the planned duration has actually elapsed.
+2. Removed the previous trust in client-provided completion minutes for reward settlement.
+3. The backend now rejects early completion attempts with a clear error message and keeps interruption as the intended early-exit path.
+4. Added `backend/tests/test_focus_service.py` to cover both failure and success paths for session completion settlement.
+5. Verified with `python -m unittest discover -s tests -v` in `backend/` and confirmed both focus completion tests passed.
+## Sprint 2 Update - Interrupt Resume Flow - 2026-03-11
+1. Adjusted focus lifecycle semantics based on teacher feedback: `interrupt` now preserves elapsed time for resume, while `abandon` clears elapsed time.
+2. Updated `backend/app/services/focus_service.py`:
+   - interrupted sessions now keep `actual_minutes`, remain unsettled, and can be resumed
+   - added `resume_session()` to continue from saved elapsed time
+   - abandoned sessions now reset `actual_minutes` to `0`
+   - blocked creating a new session when an unfinished interrupted session already exists
+3. Added `POST /api/v1/focus-sessions/{id}/resume` in `backend/app/api/v1/focus_sessions.py`.
+4. Updated the frontend focus panel so interrupted sessions can be resumed from the dashboard without losing saved progress.
+5. Updated the desktop guard interruption flow so a guard-triggered interrupt now pauses the session instead of clearing its saved elapsed time.
+6. Expanded `backend/tests/test_focus_service.py` to cover interrupt, resume, abandon, and the interrupted-session start guard.
+7. Verified with:
+   - `python -m unittest discover -s tests -v`
+   - `python -m compileall app tests`
+   - `node --check frontend/src/app.js`
+
+## Sprint 2 Update - Redeem Verification Boundary - 2026-03-11
+1. Tightened the redeem verification path so `/api/v1/redeem-orders/verify` is no longer available to any logged-in user without extra merchant proof.
+2. Added `REDEEM_VERIFY_TOKEN` to backend configuration and `.env.example`.
+3. Updated `backend/app/services/redeem_service.py` to require:
+   - a configured merchant verify token
+   - a valid `X-Merchant-Token` request header
+   - `verifier_id` matching the current logged-in username
+4. Updated `backend/app/api/v1/redeem_orders.py` to return clearer HTTP statuses for verify failures:
+   - `403` for permission problems
+   - `503` when merchant verification is not configured
+   - `400` for business-state errors such as expired or already-verified orders
+5. Updated the frontend verify form to collect the merchant token and send it via `X-Merchant-Token`.
+6. Bound the frontend verifier ID to the current logged-in username so the UI no longer encourages verifier spoofing.
+7. Added `backend/tests/test_redeem_service.py` to cover token configuration, invalid token rejection, verifier mismatch rejection, and successful verification.
+
+## Sprint 2 Update - Desktop Site Block Feedback - 2026-03-11
+1. Improved `desktop/scripts/windows/siteBlock.ps1` so it now checks for administrator permission before editing the Windows hosts file.
+2. Switched hosts-file writing to an explicit UTF-8 without BOM write path and wrapped it in clearer error handling.
+3. Updated `desktop/guard/focusGuard.js` so site-block failures are classified more clearly, especially the administrator-required case.
+4. Added `siteBlockReason` to guard status and surfaced a clearer `permission_required` state for renderer messaging.
+5. Updated the frontend desktop-guard status note so Electron now tells the user directly when site blocking needs administrator launch, instead of only showing a vague failure.
+6. Updated the blocked-app guard copy to match the new pause/resume semantics introduced earlier in Sprint 2.
+
+## Sprint 2 Scope Note - AI Deferred - 2026-03-11
+1. AI stability hardening work was intentionally deferred in this round after the user chose to postpone AI changes and explore cloud deployment options for a distilled model later.
+
+## Sprint 2 Validation - 2026-03-11
+1. Verified with `python -m unittest discover -s tests -v`.
+2. Verified with `python -m compileall app tests`.
+3. Verified frontend syntax with `node --check frontend/src/app.js`.
+4. Verified desktop guard syntax with `node --check desktop/guard/focusGuard.js`.
+5. Verified PowerShell parsing with `[scriptblock]::Create((Get-Content 'desktop/scripts/windows/siteBlock.ps1' -Raw))`.
+## Sprint 2 Update - Feedback Collection Module - 2026-03-11
+1. Added a new `feedback_message` table in `db/schema.sql` and created the matching backend model, schema, service, and API route files.
+2. Added authenticated feedback APIs so logged-in users can submit improvement suggestions with `POST /api/v1/feedback` and review their recent submissions with `GET /api/v1/feedback/my`.
+3. The feedback payload now stores category, title, content, optional contact email, and timestamps, which makes the suggestion box a real data collection path instead of a frontend-only mock.
+4. Updated the frontend dashboard with a dedicated feedback panel so users can leave improvement ideas directly inside the product and immediately see their recent messages.
+5. Wired feedback loading into the normal dashboard refresh flow so new submissions appear after save without manual page reload.
+6. Added `backend/tests/test_feedback_service.py` to cover trim behavior, post-trim validation, and newest-first ordering.
+
+## Sprint 2 Validation Refresh - 2026-03-11
+1. Re-verified with `python -m unittest discover -s tests -v` after the feedback module landed.
+2. Re-verified with `python -m compileall app tests`.
+3. Re-verified frontend syntax with `node --check frontend/src/app.js`.
+## Sprint 2 Note - Feedback DB Upgrade Script - 2026-03-11
+1. Added `db/add_feedback_message.sql` so an already-initialized local MySQL database can enable the feedback module without a full schema reset.
+## Sprint 2 AI Direction Update - 2026-03-11
+1. Decided to keep the current AI path on the user's existing free API for Sprint 2 instead of switching to a self-hosted distilled model.
+2. The main reason is delivery risk control: the current `backend/app/services/ai_service.py` adapter already supports provider switching, while self-hosting would add new deployment and runtime variables late in the sprint.
+3. This keeps the AI feature aligned with the present backend design and leaves self-hosted distilled-model deployment as a later optimization path rather than a Sprint 2 dependency.
+
+## Sprint 2 Manual Test Checklist - 2026-03-11
+1. If the local MySQL database was initialized before the feedback module was added, run `db/add_feedback_message.sql` once before testing the new feedback feature.
+2. Start the backend with the configured AI API environment variables and verify `http://127.0.0.1:8000/docs` loads successfully.
+3. Start the static frontend on port `5173` and confirm login, dashboard refresh, and authenticated API calls work normally.
+4. Optional but recommended: start Electron and confirm desktop guard status appears in the dashboard.
+5. Focus flow manual check:
+   - start a session
+   - interrupt it and confirm saved minutes remain
+   - resume it and confirm the timer continues
+   - abandon it and confirm the session is dropped without retained progress
+6. Redeem flow manual check:
+   - create a redeem order
+   - verify it with the configured merchant token
+   - confirm invalid or missing token requests are rejected
+7. Feedback flow manual check:
+   - submit one message in the new feedback panel
+   - refresh the dashboard
+   - confirm the message appears in the recent feedback list
+8. AI flow manual check:
+   - send one simple study question through the dashboard
+   - confirm the reply returns through the configured free API
+   - if the provider limit is hit, record the error message and treat it as a quota issue rather than a backend routing failure
+9. Website blacklist manual check remains pending under administrator-launched Electron and should be tested separately with sample domains such as `youtube.com` and `bilibili.com`.
+## Sprint 2 Fix - AI UTF-8 Request Transport - 2026-03-11
+1. Replaced the previous `urllib`-based AI HTTP transport in `backend/app/services/ai_service.py` with an explicit UTF-8 JSON request flow.
+2. The goal of this change is to avoid the previous request-path encoding failure observed when sending Chinese questions such as `你是谁`.
+3. Added `backend/tests/test_ai_service.py` to verify that Chinese prompt content is emitted as UTF-8 in the outbound provider request body.
+
+## Sprint 2 Fix - Resume Exact Remaining Time - 2026-03-11
+1. Updated `backend/app/services/focus_service.py` so interrupted sessions now resume from the exact saved elapsed duration instead of only the floored whole-minute value.
+2. Updated `frontend/src/app.js` so the paused-session countdown is rendered from the exact saved elapsed time, which means an interrupt at `24:15` remaining will now resume from `24:15` rather than jumping back to `25:00`.
+3. Added a backend test for sub-minute pause/resume continuity in `backend/tests/test_focus_service.py`.
+
+## Sprint 2 Validation Refresh 2 - 2026-03-11
+1. Re-verified with `python -m unittest discover -s tests -v` after the AI transport and exact-resume fixes.
+2. Re-verified with `python -m compileall app tests`.
+3. Re-verified frontend syntax with `node --check frontend/src/app.js`.
+## Sprint 2 Note - Manual Smoke Scripts - 2026-03-11
+1. Added `backend/scripts/smoke_ai_chat.py` for direct login-plus-AI endpoint testing.
+2. Added `backend/scripts/smoke_focus_resume.py` for direct interrupt/resume remaining-time testing.
+## Sprint 2 Update - Leaderboard Demo Scope Refresh - 2026-03-11
+1. Expanded the leaderboard backend to support college, school, and cross-school scopes with optional school and college selection.
+2. Enriched leaderboard rows with school and college names so the UI can show full campus labels during demos.
+3. Simplified the redeem panel to focus on coupon-code generation and generated-code display instead of making verification the main workflow.
+4. Updated demo dictionary seed data to use full campus names such as `Hubei University` and `Wuhan University of Science and Technology`.
+5. Added `db/add_demo_leaderboard_dicts.sql` for incremental demo dictionary updates on existing databases.
+6. Added `db/add_demo_leaderboard_samples.sql` so existing databases can seed one Hubei University college sample and one Wuhan University of Science and Technology sample for leaderboard demos.
+
+## Sprint 2 Update - Redeem Generate-Only Cleanup - 2026-03-11
+1. Removed the remaining dashboard-side redeem verification and cancel actions so the user flow now focuses on generating and copying coupon codes only.
+2. Cleaned the leaderboard context strings and campus labels so demo separators render as normal `/` text instead of encoding-garbled characters.
+3. Kept the backend redeem verify endpoint available for future merchant flows, but it is no longer part of the main Sprint 2 demo path.
+## Sprint 2 Update - Leaderboard Visual Polish - 2026-03-11
+1. Refreshed the leaderboard presentation in `frontend/src/app.js` and `frontend/src/styles.css` so ranking entries now render as showcase cards instead of plain rows.
+2. Highlighted the top three positions with distinct visual treatment and added clearer score, campus, and focus-stat chips for demo readability.
+3. Kept the college, school, and all-schools filter structure unchanged while improving the visual hierarchy for presentation use.
+## Sprint 2 Update - Guard Violation Clears Progress - 2026-03-11
+1. Adjusted the desktop-guard violation flow so blocked-app detection now abandons the active session instead of creating a resumable interrupt.
+2. This means guard-triggered violations now clear saved progress and award zero points, while manual interrupt still remains resumable.
+3. Updated the desktop guard event wording to match the new no-reward abandonment behavior for demos and teacher review.
+## Sprint 2 Update - Blocked Site Detection And Popup - 2026-03-12
+1. Extended the Electron guard so website monitoring now also inspects visible browser window titles for blocked domain keywords such as `bilibili` and `youtube`.
+2. Added desktop popup alerts for blocked app and blocked site violations so the user gets an immediate warning window when focus rules are broken.
+3. Updated the renderer guard flow so both blocked apps and blocked sites now end the session with abandon-style clearing and zero reward.

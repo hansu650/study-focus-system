@@ -1,4 +1,4 @@
-﻿"""Redeem order service."""
+"""Redeem order service."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.db.models.points import PointLedger
 from app.db.models.redeem import RedeemOrder
 from app.db.models.user import AppUser
@@ -22,6 +23,8 @@ from app.schemas.redeem import (
 
 class RedeemService:
     """Business service for point redeem and verification flow."""
+
+    VERIFY_TOKEN_PLACEHOLDERS = {"", "CHANGE_ME", "PLEASE_CHANGE_ME", "YOUR_VERIFY_TOKEN"}
 
     @staticmethod
     def create_order(db: Session, user: AppUser, payload: RedeemOrderCreateRequest) -> RedeemOrder:
@@ -75,11 +78,34 @@ class RedeemService:
         return order
 
     @staticmethod
+    def authorize_verifier(current_user: AppUser, payload: RedeemOrderVerifyRequest, merchant_token: str | None) -> None:
+        """Require a configured merchant token and bind verifier ID to the login user."""
+
+        expected_token = (settings.redeem_verify_token or "").strip()
+        if expected_token in RedeemService.VERIFY_TOKEN_PLACEHOLDERS:
+            raise RuntimeError("Redeem verification is not configured. Set REDEEM_VERIFY_TOKEN in backend/.env.")
+
+        provided_token = (merchant_token or "").strip()
+        if not provided_token:
+            raise PermissionError("Merchant verify token is required.")
+
+        if secrets.compare_digest(provided_token, expected_token) is False:
+            raise PermissionError("Merchant verify token is invalid.")
+
+        verifier_id = payload.verifier_id.strip()
+        if verifier_id != current_user.username:
+            raise PermissionError("verifier_id must match the current logged-in username.")
+
+    @staticmethod
     def verify_order_by_token(
         db: Session,
+        current_user: AppUser,
         payload: RedeemOrderVerifyRequest,
+        merchant_token: str | None,
     ) -> RedeemOrder:
         """Verify redeem order using coupon token (simulate store scan)."""
+
+        RedeemService.authorize_verifier(current_user=current_user, payload=payload, merchant_token=merchant_token)
 
         order = db.scalar(
             select(RedeemOrder).where(RedeemOrder.coupon_token == payload.coupon_token).with_for_update()
@@ -107,7 +133,7 @@ class RedeemService:
 
         order.status = RedeemOrderStatus.VERIFIED.value
         order.verified_at = now
-        order.verified_by = payload.verifier_id
+        order.verified_by = current_user.username
 
         db.add(order)
         db.commit()

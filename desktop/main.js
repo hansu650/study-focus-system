@@ -1,17 +1,45 @@
-﻿const { app, BrowserWindow, ipcMain, shell } = require("electron");
+﻿const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const path = require("node:path");
 
 const { createFocusGuard } = require("./guard/focusGuard");
 
 let mainWindow = null;
+let violationDialogOpen = false;
+
+const VIOLATION_EVENT_TYPES = new Set(["blocked_app_detected", "blocked_site_detected"]);
 
 const guard = createFocusGuard({
   emit(event) {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send("guard:event", event);
     }
+
+    if (VIOLATION_EVENT_TYPES.has(event?.type)) {
+      void showViolationDialog(event);
+    }
   },
 });
+
+async function showViolationDialog(event) {
+  if (!mainWindow || mainWindow.isDestroyed() || violationDialogOpen) {
+    return;
+  }
+
+  violationDialogOpen = true;
+  try {
+    await dialog.showMessageBox(mainWindow, {
+      type: "warning",
+      buttons: ["OK"],
+      defaultId: 0,
+      noLink: true,
+      title: "Focus Violation Detected",
+      message: "Focus session ended",
+      detail: event?.message || "A blocked app or website was detected. Progress has been cleared and no points were awarded.",
+    });
+  } finally {
+    violationDialogOpen = false;
+  }
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({

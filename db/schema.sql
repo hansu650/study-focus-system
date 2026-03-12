@@ -1,4 +1,4 @@
-﻿-- ============================================================================
+-- ============================================================================
 -- Project: Study Focus (Desktop Pomodoro + Incentive System)
 -- Database: MySQL 8.0+
 -- Purpose : Core schema DDL
@@ -12,6 +12,7 @@ USE study_focus;
 SET NAMES utf8mb4;
 
 -- Drop tables in reverse dependency order for re-runs
+DROP TABLE IF EXISTS feedback_message;
 DROP TABLE IF EXISTS redeem_order;
 DROP TABLE IF EXISTS point_ledger;
 DROP TABLE IF EXISTS focus_session;
@@ -119,7 +120,26 @@ CREATE TABLE app_user (
     ON UPDATE CASCADE ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='User table';
 
--- 5) Pomodoro session table
+-- 5) Feedback message table
+CREATE TABLE feedback_message (
+  feedback_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Feedback ID',
+  user_id BIGINT UNSIGNED NOT NULL COMMENT 'User ID',
+  category VARCHAR(32) NOT NULL DEFAULT 'GENERAL' COMMENT 'Feedback category',
+  title VARCHAR(120) NOT NULL COMMENT 'Feedback title',
+  content TEXT NOT NULL COMMENT 'Feedback content',
+  contact_email VARCHAR(120) NULL COMMENT 'Optional follow-up email',
+  status ENUM('NEW','REVIEWED') NOT NULL DEFAULT 'NEW' COMMENT 'Processing status',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Created time',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Updated time',
+  PRIMARY KEY (feedback_id),
+  KEY idx_feedback_user_time (user_id, created_at),
+  KEY idx_feedback_category_status (category, status),
+  CONSTRAINT fk_feedback_user
+    FOREIGN KEY (user_id) REFERENCES app_user(user_id)
+    ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='User product feedback';
+
+-- 6) Pomodoro session table
 CREATE TABLE focus_session (
   session_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Session ID',
   user_id BIGINT UNSIGNED NOT NULL COMMENT 'User ID',
@@ -149,7 +169,7 @@ CREATE TABLE focus_session (
   CONSTRAINT ck_focus_actual_minutes CHECK (actual_minutes <= planned_minutes)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Pomodoro sessions';
 
--- 6) Point ledger table
+-- 7) Point ledger table
 CREATE TABLE point_ledger (
   txn_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Transaction ID',
   user_id BIGINT UNSIGNED NOT NULL COMMENT 'User ID',
@@ -171,7 +191,7 @@ CREATE TABLE point_ledger (
   CONSTRAINT ck_ledger_balance CHECK (balance_after = balance_before + change_points)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Point ledger';
 
--- 7) Redeem order table
+-- 8) Redeem order table
 CREATE TABLE redeem_order (
   redeem_order_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Redeem order ID',
   order_no VARCHAR(32) NOT NULL COMMENT 'Business order number',

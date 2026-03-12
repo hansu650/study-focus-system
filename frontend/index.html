@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -258,6 +258,7 @@
             <div class="session-actions">
               <button id="complete-session-btn" class="primary-button secondary-tone" type="button">Complete Session</button>
               <button id="interrupt-session-btn" class="ghost-button warning-tone" type="button">Interrupt</button>
+              <button id="resume-session-btn" class="ghost-button secondary-tone" type="button" hidden>Resume</button>
               <button id="abandon-session-btn" class="ghost-button danger-tone" type="button">Abandon</button>
             </div>
 
@@ -325,17 +326,37 @@
         </section>
 
         <section class="feature-grid lower-grid">
-          <article class="panel feature-panel">
+          <article class="panel feature-panel leaderboard-panel">
             <div class="panel-head">
               <p class="eyebrow">Points And Ranking</p>
-              <h3>Track reward flow and compare within your school</h3>
+              <h3>Compare focus results by college, by campus, or across demo universities</h3>
             </div>
 
-            <div class="panel-tabs">
-              <button class="tab-button is-active" data-period="day" type="button">Day</button>
-              <button class="tab-button" data-period="month" type="button">Month</button>
-              <button class="tab-button" data-period="year" type="button">Year</button>
+            <div id="leaderboard-period-tabs" class="panel-tabs">
+              <button class="tab-button period-tab is-active" data-period="day" type="button">Day</button>
+              <button class="tab-button period-tab" data-period="month" type="button">Month</button>
+              <button class="tab-button period-tab" data-period="year" type="button">Year</button>
             </div>
+
+            <div id="leaderboard-scope-tabs" class="panel-tabs scope-tabs">
+              <button class="tab-button scope-tab" data-scope="college" type="button">College</button>
+              <button class="tab-button scope-tab is-active" data-scope="school" type="button">School</button>
+              <button class="tab-button scope-tab" data-scope="global" type="button">All Schools</button>
+            </div>
+
+            <div class="leaderboard-filter-bar">
+              <label>
+                <span>School</span>
+                <select id="leaderboard-school-select"></select>
+              </label>
+
+              <label id="leaderboard-college-wrap">
+                <span>College</span>
+                <select id="leaderboard-college-select"></select>
+              </label>
+            </div>
+
+            <p id="leaderboard-context" class="leaderboard-context">Loading ranking scope...</p>
 
             <div class="table-card compact-table">
               <div class="table-header">
@@ -344,7 +365,7 @@
               <div id="ledger-list" class="table-list empty-state">No ledger items yet.</div>
             </div>
 
-            <div class="table-card compact-table">
+            <div class="table-card compact-table leaderboard-card">
               <div class="table-header">
                 <h4>Leaderboard</h4>
               </div>
@@ -354,8 +375,8 @@
 
           <article class="panel feature-panel redeem-panel">
             <div class="panel-head">
-              <p class="eyebrow">Redeem And Verify</p>
-              <h3>Convert points into print quota and simulate store scan</h3>
+              <p class="eyebrow">Redeem Code</p>
+              <h3>Generate a printable coupon code from points for the demo flow</h3>
             </div>
 
             <form id="redeem-form" class="stack-form">
@@ -375,32 +396,70 @@
               </label>
 
               <label>
-                <span>Expire Minutes</span>
+                <span>Valid Minutes</span>
                 <input name="expire_minutes" type="number" value="120" min="10" required />
               </label>
 
-              <button class="primary-button" type="submit">Create Redeem Order</button>
+              <button class="primary-button" type="submit">Generate Coupon Code</button>
             </form>
 
-            <form id="verify-form" class="stack-form verify-form">
+            <div class="coupon-highlight-box">
+              <span class="meta-label">Latest Coupon Code</span>
+              <strong id="latest-coupon-token">No code yet.</strong>
+              <p id="latest-coupon-note" class="hint-text">Create a redeem order and the latest coupon code will appear here.</p>
+            </div>
+
+            <div class="table-card">
+              <div class="table-header">
+                <h4>Generated Codes</h4>
+              </div>
+              <div id="redeem-list" class="table-list empty-state">No redeem orders yet.</div>
+            </div>
+          </article>
+
+          <article class="panel feature-panel feedback-panel">
+            <div class="panel-head">
+              <p class="eyebrow">Feedback Wall</p>
+              <h3>Leave improvement ideas so Sprint 2 keeps moving in the right direction</h3>
+            </div>
+
+            <form id="feedback-form" class="stack-form feedback-form">
               <label>
-                <span>Coupon Token</span>
-                <input name="coupon_token" type="text" placeholder="Paste token to verify" required />
+                <span>Category</span>
+                <select name="category">
+                  <option value="GENERAL">GENERAL</option>
+                  <option value="UI">UI</option>
+                  <option value="FOCUS">FOCUS</option>
+                  <option value="REDEEM">REDEEM</option>
+                  <option value="DESKTOP">DESKTOP</option>
+                  <option value="BUG">BUG</option>
+                  <option value="IDEA">IDEA</option>
+                </select>
               </label>
 
               <label>
-                <span>Verifier ID</span>
-                <input name="verifier_id" type="text" value="store-owner-001" required />
+                <span>Title</span>
+                <input name="title" type="text" placeholder="What should we improve first?" required />
               </label>
 
-              <button class="ghost-button secondary-tone" type="submit">Verify Coupon</button>
+              <label>
+                <span>Contact Email (Optional)</span>
+                <input name="contact_email" type="email" placeholder="Leave an email if you want follow-up" />
+              </label>
+
+              <label>
+                <span>Suggestion</span>
+                <textarea name="content" rows="6" placeholder="Tell us what felt awkward, missing, or worth improving." required></textarea>
+              </label>
+
+              <button class="primary-button" type="submit">Send Feedback</button>
             </form>
 
             <div class="table-card">
               <div class="table-header">
-                <h4>Redeem Orders</h4>
+                <h4>Recent Messages</h4>
               </div>
-              <div id="redeem-list" class="table-list empty-state">No redeem orders yet.</div>
+              <div id="feedback-list" class="table-list empty-state">No feedback submitted yet.</div>
             </div>
           </article>
         </section>

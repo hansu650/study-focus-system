@@ -1,8 +1,9 @@
-﻿const path = require("node:path");
+const path = require("node:path");
 const { execFile } = require("node:child_process");
 const { promisify } = require("node:util");
 
 const execFileAsync = promisify(execFile);
+const BROWSER_PROCESS_NAMES = new Set(["chrome", "msedge", "firefox", "brave", "opera", "iexplore"]);
 
 function createFocusGuard({ emit = () => {} } = {}) {
   const state = {
@@ -15,6 +16,7 @@ function createFocusGuard({ emit = () => {} } = {}) {
     monitorTimer: null,
     isChecking: false,
     siteBlockState: "inactive",
+    siteBlockReason: null,
     lastViolation: null,
   };
 
@@ -30,6 +32,7 @@ function createFocusGuard({ emit = () => {} } = {}) {
     state.blockedSites = normalizeDomains(payload.blockedSites || []);
     state.lastViolation = null;
     state.siteBlockState = "inactive";
+    state.siteBlockReason = null;
 
     applyWindowPolicy(windowRef, state.lockMode);
 
@@ -37,22 +40,26 @@ function createFocusGuard({ emit = () => {} } = {}) {
       try {
         await runSiteBlockScript("Apply", state.blockedSites);
         state.siteBlockState = "active";
+        state.siteBlockReason = `Blocked ${state.blockedSites.length} distraction domains.`;
         emit(buildGuardEvent("site_block_enabled", {
-          message: `Blocked ${state.blockedSites.length} distraction domains.`,
+          message: state.siteBlockReason,
         }));
       } catch (error) {
-        state.siteBlockState = "error";
+        const siteBlockError = interpretSiteBlockError(error);
+        state.siteBlockState = siteBlockError.state;
+        state.siteBlockReason = siteBlockError.message;
         emit(buildGuardEvent("site_block_error", {
-          message: `Site block was skipped: ${error.message}`,
+          message: siteBlockError.message,
         }));
       }
     }
 
-    if (state.blockedApps.length > 0 && supportsProcessWatch()) {
+    const shouldMonitorViolations = (state.blockedApps.length > 0 || state.blockedSites.length > 0) && supportsProcessWatch();
+    if (shouldMonitorViolations) {
       state.monitorTimer = setInterval(() => {
-        void checkBlockedProcesses(windowRef);
+        void checkGuardViolations(windowRef);
       }, state.monitorIntervalMs);
-      await checkBlockedProcesses(windowRef);
+      await checkGuardViolations(windowRef);
     }
 
     emit(buildGuardEvent("guard_state", {
@@ -75,8 +82,9 @@ function createFocusGuard({ emit = () => {} } = {}) {
       try {
         await runSiteBlockScript("Clear", []);
       } catch (error) {
+        const siteBlockError = interpretSiteBlockError(error);
         emit(buildGuardEvent("site_block_error", {
-          message: `Site block cleanup failed: ${error.message}`,
+          message: `Site block cleanup failed: ${siteBlockError.message}`,
         }));
       }
     }
@@ -89,6 +97,7 @@ function createFocusGuard({ emit = () => {} } = {}) {
     state.blockedApps = [];
     state.blockedSites = [];
     state.siteBlockState = "inactive";
+    state.siteBlockReason = null;
 
     if (hadActiveGuard) {
       emit(buildGuardEvent("guard_state", {
@@ -110,6 +119,7 @@ function createFocusGuard({ emit = () => {} } = {}) {
       blockedSites: [...state.blockedSites],
       monitorIntervalMs: state.monitorIntervalMs,
       siteBlockState: state.siteBlockState,
+      siteBlockReason: state.siteBlockReason,
       lastViolation: state.lastViolation,
       platform: process.platform,
       supports: {
@@ -120,33 +130,51 @@ function createFocusGuard({ emit = () => {} } = {}) {
     };
   }
 
-  async function checkBlockedProcesses(windowRef) {
-    if (!state.active || state.blockedApps.length === 0 || state.isChecking) {
+  async function checkGuardViolations(windowRef) {
+    if (!state.active || state.isChecking || (!state.blockedApps.length && !state.blockedSites.length)) {
       return;
     }
 
     state.isChecking = true;
 
     try {
-      const runningProcesses = await listProcessNames();
-      const hit = state.blockedApps.find((item) => runningProcesses.has(item));
-      if (!hit) {
-        return;
+      if (state.blockedApps.length > 0) {
+        const runningProcesses = await listProcessNames();
+        const appHit = state.blockedApps.find((item) => runningProcesses.has(item));
+        if (appHit) {
+          emitViolation(windowRef, buildGuardEvent("blocked_app_detected", {
+            processName: appHit,
+            message: `Blocked app detected: ${appHit}. This session will be ended with no reward.`,
+          }));
+          return;
+        }
       }
 
-      const violation = buildGuardEvent("blocked_app_detected", {
-        processName: hit,
-        message: `Blocked app detected: ${hit}. Interrupt this session.`,
-      });
-
-      if (!isDuplicateViolation(state.lastViolation, violation)) {
-        state.lastViolation = violation;
-        focusWindow(windowRef, state.lockMode);
-        emit(violation);
+      if (state.blockedSites.length > 0) {
+        const browserWindows = await listBrowserWindows();
+        const siteHit = findBlockedSiteHit(browserWindows, state.blockedSites);
+        if (siteHit) {
+          emitViolation(windowRef, buildGuardEvent("blocked_site_detected", {
+            domain: siteHit.domain,
+            processName: siteHit.processName,
+            windowTitle: siteHit.windowTitle,
+            message: `Blocked site detected: ${siteHit.domain}. This session will be ended with no reward.`,
+          }));
+        }
       }
     } finally {
       state.isChecking = false;
     }
+  }
+
+  function emitViolation(windowRef, violation) {
+    if (isDuplicateViolation(state.lastViolation, violation)) {
+      return;
+    }
+
+    state.lastViolation = violation;
+    focusWindow(windowRef, state.lockMode);
+    emit(violation);
   }
 
   async function listProcessNames() {
@@ -166,6 +194,29 @@ function createFocusGuard({ emit = () => {} } = {}) {
     return new Set(names.map(normalizeAppName).filter(Boolean));
   }
 
+  async function listBrowserWindows() {
+    const script = [
+      "$targets = @('chrome','msedge','firefox','brave','opera','iexplore')",
+      "$items = Get-Process | Where-Object { $_.MainWindowTitle -and $targets -contains $_.ProcessName.ToLower() } | Select-Object @{Name='processName';Expression={$_.ProcessName}}, @{Name='windowTitle';Expression={$_.MainWindowTitle}}",
+      "$items | ConvertTo-Json -Compress",
+    ].join("; ");
+
+    const { stdout } = await execFileAsync(
+      "powershell.exe",
+      ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+      { windowsHide: true, maxBuffer: 1024 * 1024 }
+    );
+
+    const parsed = safeParseJson(stdout.trim());
+    const items = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+    return items
+      .map((item) => ({
+        processName: normalizeAppName(item.processName),
+        windowTitle: String(item.windowTitle || "").trim(),
+      }))
+      .filter((item) => item.processName && item.windowTitle && BROWSER_PROCESS_NAMES.has(item.processName));
+  }
+
   async function runSiteBlockScript(mode, domains) {
     const scriptPath = path.join(__dirname, "..", "scripts", "windows", "siteBlock.ps1");
     const args = [
@@ -181,10 +232,11 @@ function createFocusGuard({ emit = () => {} } = {}) {
     ];
 
     try {
-      await execFileAsync("powershell.exe", args, {
+      const { stdout } = await execFileAsync("powershell.exe", args, {
         windowsHide: true,
         maxBuffer: 1024 * 1024,
       });
+      return String(stdout || "").trim();
     } catch (error) {
       const stderr = String(error.stderr || error.message || "Site block failed.").trim();
       throw new Error(stderr || "Site block failed.");
@@ -206,6 +258,27 @@ function buildGuardEvent(type, extra = {}) {
   };
 }
 
+function interpretSiteBlockError(error) {
+  const message = String(error?.message || "Site block failed.").trim();
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes("administrator") ||
+    normalized.includes("access is denied") ||
+    normalized.includes("requested operation requires elevation")
+  ) {
+    return {
+      state: "permission_required",
+      message: "Site blocking requires running Electron as administrator.",
+    };
+  }
+
+  return {
+    state: "error",
+    message: message || "Site block failed.",
+  };
+}
+
 function isDuplicateViolation(previousViolation, nextViolation) {
   if (!previousViolation || !nextViolation) {
     return false;
@@ -215,13 +288,51 @@ function isDuplicateViolation(previousViolation, nextViolation) {
     return false;
   }
 
-  if (previousViolation.processName !== nextViolation.processName) {
+  if ((previousViolation.processName || "") !== (nextViolation.processName || "")) {
+    return false;
+  }
+
+  if ((previousViolation.domain || "") !== (nextViolation.domain || "")) {
     return false;
   }
 
   const previousAt = new Date(previousViolation.detectedAt).getTime();
   const nextAt = new Date(nextViolation.detectedAt).getTime();
   return Number.isFinite(previousAt) && Number.isFinite(nextAt) && nextAt - previousAt < 15000;
+}
+
+function findBlockedSiteHit(browserWindows, blockedSites) {
+  for (const browserWindow of browserWindows) {
+    const title = String(browserWindow.windowTitle || "").toLowerCase();
+    for (const domain of blockedSites) {
+      const keywords = buildDomainKeywords(domain);
+      if (keywords.some((keyword) => title.includes(keyword))) {
+        return {
+          domain,
+          processName: browserWindow.processName,
+          windowTitle: browserWindow.windowTitle,
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
+function buildDomainKeywords(domain) {
+  const normalized = normalizeDomain(domain);
+  const parts = normalized.split(".").filter(Boolean);
+  const keywords = [normalized];
+
+  if (parts.length >= 2) {
+    keywords.push(parts[parts.length - 2]);
+  }
+
+  if (parts.length >= 3) {
+    keywords.push(parts[0]);
+  }
+
+  return Array.from(new Set(keywords.filter((item) => item && item.length >= 3)));
 }
 
 function applyWindowPolicy(windowRef, lockMode) {
