@@ -1,4 +1,4 @@
-const STORAGE_KEYS = {
+﻿const STORAGE_KEYS = {
   apiBase: "study_focus_api_base",
   token: "study_focus_token",
   user: "study_focus_user",
@@ -11,7 +11,68 @@ const STORAGE_KEYS = {
 };
 
 const DEFAULT_API_BASE = "http://127.0.0.1:8000/api/v1";
-const DEFAULT_DEMO_PASSWORD = "Test123456";
+const DEFAULT_DEMO_PASSWORD = "StudyFocus123!";
+const DEFAULT_LOGIN_DEMO_USERNAME = "hubu_mjc_se_101";
+const CURRENT_PAGE = document.body.dataset.page || "landing";
+
+const PAGE_META = {
+  landing: {
+    browserTitle: "Study Focus Atlas",
+    eyebrow: "Welcome",
+    title: "A campus study system that finally behaves like separate workspaces, not one crowded screen.",
+    lead:
+      "Login and registration stay on the landing page. After that, focus, rankings, learning, rewards, and feedback each get a dedicated destination.",
+    tags: ["Login", "Register", "Seeded Accounts", "Campus Demo", "Desktop Guard"],
+  },
+  home: {
+    browserTitle: "Studio Home | Study Focus Atlas",
+    eyebrow: "Studio Home",
+    title: "Choose the workspace you need and leave the rest out of your way.",
+    lead:
+      "This overview page keeps the profile, totals, and jump cards visible while the heavy task surfaces live on their own routes.",
+    tags: ["Overview", "Quick Jumps", "Campus Metrics", "Cleaner Demo", "Multi-Page"],
+  },
+  focus: {
+    browserTitle: "Focus Lab | Study Focus Atlas",
+    eyebrow: "Focus Lab",
+    title: "One screen, one job: run the session and let the guard own the moment.",
+    lead:
+      "This route borrows the single-purpose clarity of Pomofocus, then adds desktop guard status, resume flow, and violation logs.",
+    tags: ["Timer", "Resume", "Guard Events", "Blocked Apps", "Blocked Sites"],
+  },
+  rankings: {
+    browserTitle: "Rankings | Study Focus Atlas",
+    eyebrow: "Rankings",
+    title: "School and college leaderboards deserve a page that looks presentable in a real demo.",
+    lead:
+      "Filters, rank cards, and the point ledger are isolated here so the school comparison view is easier to read and explain.",
+    tags: ["School Scope", "College Scope", "Day Month Year", "Point Ledger", "Demo Ready"],
+  },
+  learning: {
+    browserTitle: "Learning | Study Focus Atlas",
+    eyebrow: "Learning Corner",
+    title: "Keep the daily question and AI break-space together instead of burying them under operations.",
+    lead:
+      "This page is calmer by design: question at the top, chat below, and no ranking or redeem noise fighting for attention.",
+    tags: ["Daily Question", "AI Chat", "Break Space", "Study Support", "Lighter Layout"],
+  },
+  rewards: {
+    browserTitle: "Rewards | Study Focus Atlas",
+    eyebrow: "Rewards",
+    title: "Coupon generation should feel like a clean student action, not a crowded side widget.",
+    lead:
+      "The rewards route centers the redeem form, latest coupon, and recent generated codes so the printing benefit is easy to demonstrate.",
+    tags: ["Redeem Code", "Point Spend", "Coupon Copy", "Print Shop", "Student Flow"],
+  },
+  feedback: {
+    browserTitle: "Feedback | Study Focus Atlas",
+    eyebrow: "Feedback",
+    title: "A product loop page for UI notes, bug reports, and ideas from real student use.",
+    lead:
+      "Suggestions are separated from the study controls so feedback feels intentional and the recent messages list stays readable.",
+    tags: ["Suggestions", "UI Notes", "Bug Reports", "Ideas", "Recent Messages"],
+  },
+};
 
 const state = {
   apiBase: localStorage.getItem(STORAGE_KEYS.apiBase) || DEFAULT_API_BASE,
@@ -42,6 +103,13 @@ const state = {
   },
 };
 
+const uiMotion = {
+  observer: null,
+  mutationObserver: null,
+  initialized: false,
+  refreshFrame: 0,
+};
+
 const elements = {
   apiBaseInput: document.querySelector("#api-base-input"),
   saveApiBaseBtn: document.querySelector("#save-api-base-btn"),
@@ -50,6 +118,10 @@ const elements = {
   fillRegisterDemoBtn: document.querySelector("#fill-register-demo-btn"),
   fillLoginDemoBtn: document.querySelector("#fill-login-demo-btn"),
   quickStartHint: document.querySelector("#quick-start-hint"),
+  headlineEyebrow: document.querySelector("#headline-eyebrow"),
+  headlineTitle: document.querySelector("#headline-title"),
+  headlineLead: document.querySelector("#headline-lead"),
+  headlineTags: document.querySelector("#headline-tags"),
   authPanel: document.querySelector("#auth-panel"),
   dashboard: document.querySelector("#dashboard"),
   loginForm: document.querySelector("#login-form"),
@@ -110,6 +182,18 @@ function bootstrap() {
   bindEvents();
   elements.apiBaseInput.value = state.apiBase;
   prefillFormsFromHistory();
+  applyPageMeta();
+
+  if (enforceRouteBoundary()) {
+    return;
+  }
+
+  injectPenguinBrandBadge();
+  const loaderBlocksMotion = initializePenguinLoader();
+  if (!loaderBlocksMotion) {
+    initializeMotionSystem();
+  }
+
   updateAuthView();
   renderDesktopStatus();
   void initDesktopBridge();
@@ -117,6 +201,217 @@ function bootstrap() {
   if (state.token) {
     void refreshDashboard();
   }
+}
+
+function applyPageMeta() {
+  const meta = PAGE_META[CURRENT_PAGE] || PAGE_META.home;
+  document.title = meta.browserTitle;
+
+  elements.headlineEyebrow.textContent = meta.eyebrow;
+  elements.headlineTitle.textContent = meta.title;
+  elements.headlineLead.textContent = meta.lead;
+  elements.headlineTags.innerHTML = meta.tags
+    .map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`)
+    .join("");
+}
+
+function enforceRouteBoundary() {
+  if (state.token && CURRENT_PAGE === "landing") {
+    goToPage("home");
+    return true;
+  }
+
+  if (!state.token && CURRENT_PAGE !== "landing") {
+    goToPage("landing");
+    return true;
+  }
+
+  return false;
+}
+
+function goToPage(page) {
+  const fileName = page === "landing" ? "index.html" : `${page}.html`;
+  const nextUrl = new URL(`./${fileName}`, window.location.href);
+  window.location.replace(nextUrl.href);
+}
+
+function injectPenguinBrandBadge() {
+  const brand = document.querySelector(".rail-brand");
+  if (!brand || brand.querySelector(".penguin-brand-badge")) {
+    return;
+  }
+
+  brand.insertAdjacentHTML(
+    "afterbegin",
+    `
+      <div class="penguin-brand-badge" aria-hidden="true">
+        <img src="./assets/penguin-mark.svg" alt="" />
+      </div>
+    `
+  );
+}
+
+function initializePenguinLoader() {
+  const hasSeenIntro = sessionStorage.getItem("study_focus_penguin_intro") === "1";
+  if (hasSeenIntro) {
+    document.body.classList.add("penguin-loader-complete");
+    return false;
+  }
+
+  document.body.classList.add("penguin-loader-active");
+
+  const overlay = document.createElement("div");
+  overlay.className = "penguin-loader";
+  overlay.innerHTML = `
+    <div class="penguin-loader-card">
+      <img class="penguin-loader-icon" src="./assets/penguin-mark.svg" alt="" />
+      <p class="penguin-loader-kicker">Study Focus Atlas</p>
+      <h2>Penguin mode is warming up the desk.</h2>
+      <p class="penguin-loader-copy">Sea, grass, dawn, and lavender are being layered into the workspace.</p>
+      <div class="penguin-loader-bar"><span></span></div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  window.requestAnimationFrame(() => {
+    overlay.classList.add("is-ready");
+  });
+
+  window.setTimeout(() => {
+    overlay.classList.add("is-leaving");
+    document.body.classList.remove("penguin-loader-active");
+    document.body.classList.add("penguin-loader-complete");
+    sessionStorage.setItem("study_focus_penguin_intro", "1");
+
+    if (!uiMotion.initialized) {
+      initializeMotionSystem();
+    }
+
+    overlay.addEventListener(
+      "transitionend",
+      () => {
+        overlay.remove();
+      },
+      { once: true }
+    );
+  }, 15000);
+
+  return true;
+}
+
+function initializeMotionSystem() {
+  if (uiMotion.initialized) {
+    queueMotionRefresh();
+    return;
+  }
+
+  uiMotion.initialized = true;
+  const root = document.querySelector(".page-shell") || document.body;
+  decorateRevealTargets(root);
+
+  if (!("IntersectionObserver" in window)) {
+    markAllRevealTargetsVisible();
+    return;
+  }
+
+  uiMotion.observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) {
+          return;
+        }
+
+        entry.target.classList.add("is-visible");
+        uiMotion.observer.unobserve(entry.target);
+      });
+    },
+    {
+      threshold: 0.16,
+      rootMargin: "0px 0px -8% 0px",
+    }
+  );
+
+  uiMotion.mutationObserver = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (!(node instanceof Element)) {
+          return;
+        }
+
+        decorateRevealTargets(node);
+      });
+    });
+
+    queueMotionRefresh();
+  });
+
+  uiMotion.mutationObserver.observe(root, {
+    childList: true,
+    subtree: true,
+  });
+
+  queueMotionRefresh();
+}
+
+function decorateRevealTargets(root = document.body) {
+  if (!root) {
+    return;
+  }
+
+  const targets = [];
+  const selector = ".surface, .table-row, .chat-bubble, .headline-metric, .metric-panel, .hub-card";
+
+  if (root instanceof Element && root.matches(selector)) {
+    targets.push(root);
+  }
+
+  if (typeof root.querySelectorAll === "function") {
+    targets.push(...root.querySelectorAll(selector));
+  }
+
+  targets.forEach((target) => {
+    if (target.closest(".penguin-loader")) {
+      return;
+    }
+
+    target.classList.add("reveal-target");
+  });
+}
+
+function queueMotionRefresh() {
+  if (!uiMotion.initialized) {
+    return;
+  }
+
+  if (uiMotion.refreshFrame) {
+    window.cancelAnimationFrame(uiMotion.refreshFrame);
+  }
+
+  uiMotion.refreshFrame = window.requestAnimationFrame(() => {
+    const targets = Array.from(document.querySelectorAll(".reveal-target"));
+    targets.forEach((target, index) => {
+      if (target.dataset.revealBound === "1") {
+        return;
+      }
+
+      target.style.setProperty("--reveal-delay", `${Math.min(index * 26, 320)}ms`);
+      target.dataset.revealBound = "1";
+
+      if (uiMotion.observer) {
+        uiMotion.observer.observe(target);
+      } else {
+        target.classList.add("is-visible");
+      }
+    });
+
+    uiMotion.refreshFrame = 0;
+  });
+}
+
+function markAllRevealTargetsVisible() {
+  document.querySelectorAll(".reveal-target").forEach((target) => {
+    target.classList.add("is-visible");
+  });
 }
 
 function bindEvents() {
@@ -239,8 +534,9 @@ async function initDesktopBridge() {
 
 function updateAuthView() {
   const isLoggedIn = Boolean(state.token);
+  const isLandingPage = CURRENT_PAGE === "landing";
 
-  elements.authPanel.hidden = isLoggedIn;
+  elements.authPanel.hidden = isLoggedIn || !isLandingPage;
   elements.dashboard.hidden = !isLoggedIn;
   elements.logoutBtn.hidden = !isLoggedIn;
   elements.refreshDashboardBtn.hidden = !isLoggedIn;
@@ -276,7 +572,7 @@ function fillRegisterDemoForm() {
 }
 
 function fillLoginDemoForm() {
-  const username = localStorage.getItem(STORAGE_KEYS.lastDemoUsername) || (state.user?.username || "demo_user_1001");
+  const username = localStorage.getItem(STORAGE_KEYS.lastDemoUsername) || state.user?.username || DEFAULT_LOGIN_DEMO_USERNAME;
   setFormValue(elements.loginForm, "username", username);
   setFormValue(elements.loginForm, "password", DEFAULT_DEMO_PASSWORD);
   elements.quickStartHint.textContent = `Login form filled with ${username}.`;
@@ -284,11 +580,9 @@ function fillLoginDemoForm() {
 }
 
 function prefillFormsFromHistory() {
-  const username = localStorage.getItem(STORAGE_KEYS.lastDemoUsername);
-  if (username) {
-    setFormValue(elements.loginForm, "username", username);
-    setFormValue(elements.loginForm, "password", DEFAULT_DEMO_PASSWORD);
-  }
+  const username = localStorage.getItem(STORAGE_KEYS.lastDemoUsername) || DEFAULT_LOGIN_DEMO_USERNAME;
+  setFormValue(elements.loginForm, "username", username);
+  setFormValue(elements.loginForm, "password", DEFAULT_DEMO_PASSWORD);
 }
 
 async function handleLogin(form) {
@@ -306,6 +600,12 @@ async function handleLogin(form) {
   state.token = response.access_token;
   localStorage.setItem(STORAGE_KEYS.token, state.token);
   localStorage.setItem(STORAGE_KEYS.lastDemoUsername, payload.username);
+
+  if (CURRENT_PAGE === "landing") {
+    goToPage("home");
+    return;
+  }
+
   showToast("Login completed.", "success");
   updateAuthView();
   await refreshDashboard();
@@ -340,20 +640,22 @@ async function refreshDashboard() {
     return;
   }
 
-  const profile = await apiFetch("/users/me").catch(handleUiError);
-  if (!profile) {
-    return;
-  }
+  const profileResponse = await apiFetch("/users/me").catch(handleUiError);
+  const profile = profileResponse || state.user;
 
-  state.user = profile;
-  localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(profile));
+  if (profileResponse) {
+    state.user = profileResponse;
+    localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(profileResponse));
+  }
 
   if (!state.leaderboardSchoolId) {
-    state.leaderboardSchoolId = Number(profile.school_id || 0) || 0;
+    state.leaderboardSchoolId = Number(profile?.school_id || 0) || 0;
   }
   if (!state.leaderboardCollegeId) {
-    state.leaderboardCollegeId = Number(profile.college_id || 0) || 0;
+    state.leaderboardCollegeId = Number(profile?.college_id || 0) || 0;
   }
+
+  const schoolIdForQueries = Number(state.leaderboardSchoolId || profile?.school_id || 0) || 0;
 
   const [points, sessions, ledger, question, orders, feedback, schools, colleges, leaderboard] = await Promise.all([
     apiFetch("/points/balance").catch(handleUiError),
@@ -363,7 +665,9 @@ async function refreshDashboard() {
     apiFetch("/redeem-orders/my?page=1&page_size=8").catch(handleUiError),
     apiFetch("/feedback/my?page=1&page_size=6").catch(handleUiError),
     apiFetch("/dicts/schools", { auth: false }).catch(handleUiError),
-    apiFetch(`/dicts/colleges?school_id=${state.leaderboardSchoolId || profile.school_id}`, { auth: false }).catch(handleUiError),
+    schoolIdForQueries
+      ? apiFetch(`/dicts/colleges?school_id=${schoolIdForQueries}`, { auth: false }).catch(handleUiError)
+      : Promise.resolve([]),
     apiFetch(buildLeaderboardPath()).catch(handleUiError),
   ]);
 
@@ -584,11 +888,13 @@ async function handleCreateFeedback(form) {
     return;
   }
 
+  state.feedbacks = [feedback, ...state.feedbacks.filter((item) => item.feedback_id !== feedback.feedback_id)].slice(0, 6);
+  renderFeedback();
   showToast("Feedback submitted. Thanks for helping improve the app.", "success");
   form.reset();
   setFormValue(form, "category", "GENERAL");
-  setFormValue(form, "contact_email", state.user?.email || "");
-  await refreshDashboard();
+  setFormValue(form, "contact_email", state.user?.email || feedback.contact_email || "");
+  void refreshDashboard();
 }
 
 async function handleDesktopGuardEvent(event) {
@@ -901,20 +1207,50 @@ function renderFeedback() {
         <div class="table-row">
           <div class="row-main">
             <span class="row-title">${escapeHtml(item.title)}</span>
-            <span>${escapeHtml(item.category)}</span>
+            <span class="feedback-category-pill">${escapeHtml(item.category)}</span>
           </div>
           <div class="row-meta">
             <span>${formatDateTime(item.created_at)}</span>
             <span>${escapeHtml(item.status)}</span>
             ${contact}
           </div>
-          <div class="row-meta">
+          <div class="row-meta feedback-content-row">
             <span>${escapeHtml(item.content)}</span>
           </div>
         </div>
       `;
     })
     .join("");
+}
+
+function summarizeGuardList(values) {
+  const items = Array.isArray(values) ? values.filter(Boolean) : [];
+  if (!items.length) {
+    return "None";
+  }
+
+  if (items.length === 1) {
+    return items[0];
+  }
+
+  return `${items[0]} +${items.length - 1}`;
+}
+
+function buildSessionSummaryMarkup(status, primaryFacts, blockedApps, blockedSites) {
+  const pills = primaryFacts
+    .map((item) => `<span class="session-summary-pill">${escapeHtml(item)}</span>`)
+    .join("");
+
+  return `
+    <div class="session-summary-grid">
+      <span class="session-status-pill">${escapeHtml(status)}</span>
+      ${pills}
+    </div>
+    <div class="session-summary-grid">
+      <span class="session-summary-pill is-soft">Apps ${escapeHtml(blockedApps)}</span>
+      <span class="session-summary-pill is-soft">Sites ${escapeHtml(blockedSites)}</span>
+    </div>
+  `;
 }
 
 function renderRunningSession() {
@@ -928,13 +1264,15 @@ function renderRunningSession() {
   elements.abandonSessionBtn.disabled = !(running || paused);
 
   if (running) {
-    const apps = (running.blocked_apps_json || []).join(", ") || "none";
-    const sites = (running.blocked_sites_json || []).join(", ") || "none";
+    const apps = summarizeGuardList(running.blocked_apps_json);
+    const sites = summarizeGuardList(running.blocked_sites_json);
 
-    elements.runningSessionSummary.innerHTML = `
-      <strong>${escapeHtml(running.status)}</strong> - Planned ${running.planned_minutes} min - Lock ${escapeHtml(running.lock_mode)}<br />
-      <span class="meta-label">Apps ${escapeHtml(apps)} | Sites ${escapeHtml(sites)}</span>
-    `;
+    elements.runningSessionSummary.innerHTML = buildSessionSummaryMarkup(
+      running.status,
+      [`Planned ${running.planned_minutes} min`, `Lock ${running.lock_mode}`],
+      apps,
+      sites
+    );
     elements.focusLiveStatus.textContent = `Started at ${formatDateTime(running.start_at)}`;
     elements.heroTimerState.textContent = running.status;
     startTimer();
@@ -942,15 +1280,17 @@ function renderRunningSession() {
   }
 
   if (paused) {
-    const apps = (paused.blocked_apps_json || []).join(", ") || "none";
-    const sites = (paused.blocked_sites_json || []).join(", ") || "none";
+    const apps = summarizeGuardList(paused.blocked_apps_json);
+    const sites = summarizeGuardList(paused.blocked_sites_json);
     const elapsedMs = getSessionElapsedMs(paused);
     const remainingMs = getSessionRemainingMs(paused);
 
-    elements.runningSessionSummary.innerHTML = `
-      <strong>${escapeHtml(paused.status)}</strong> - Saved ${formatDuration(elapsedMs)} elapsed - ${formatDuration(remainingMs)} remaining - Lock ${escapeHtml(paused.lock_mode)}<br />
-      <span class="meta-label">Apps ${escapeHtml(apps)} | Sites ${escapeHtml(sites)}</span>
-    `;
+    elements.runningSessionSummary.innerHTML = buildSessionSummaryMarkup(
+      paused.status,
+      [`Saved ${formatDuration(elapsedMs)} elapsed`, `${formatDuration(remainingMs)} remaining`, `Lock ${paused.lock_mode}`],
+      apps,
+      sites
+    );
     elements.focusLiveTimer.textContent = formatDuration(remainingMs);
     elements.focusLiveStatus.textContent = `Interrupted at ${formatDateTime(paused.end_at)}. Resume continues from ${formatDuration(remainingMs)} remaining.`;
     elements.heroTimerState.textContent = paused.status;
@@ -1145,6 +1485,12 @@ function logout() {
   localStorage.removeItem(STORAGE_KEYS.activeSession);
   updateAuthView();
   renderDesktopStatus();
+
+  if (CURRENT_PAGE !== "landing") {
+    goToPage("landing");
+    return;
+  }
+
   showToast("Logged out.", "success");
 }
 
@@ -1190,10 +1536,56 @@ function showToast(message, type = "info") {
   elements.toast.textContent = message;
   elements.toast.className = `toast${type === "error" ? " is-error" : ""}${type === "success" ? " is-success" : ""}`;
 
+  if (type === "success") {
+    launchCelebration();
+  }
+
   window.clearTimeout(showToast.timerId);
   showToast.timerId = window.setTimeout(() => {
     elements.toast.hidden = true;
   }, 3600);
+}
+
+function ensureCelebrationLayer() {
+  let layer = document.querySelector("#celebration-layer");
+  if (layer) {
+    return layer;
+  }
+
+  layer = document.createElement("div");
+  layer.id = "celebration-layer";
+  layer.className = "celebration-layer";
+  document.body.appendChild(layer);
+  return layer;
+}
+
+function launchCelebration() {
+  const now = Date.now();
+  if (now - (launchCelebration.lastAt || 0) < 700) {
+    return;
+  }
+  launchCelebration.lastAt = now;
+
+  const layer = ensureCelebrationLayer();
+  const toastRect = elements.toast.getBoundingClientRect();
+  const originX = Math.min(window.innerWidth - 72, Math.max(72, toastRect.left + toastRect.width / 2));
+  const originY = Math.min(window.innerHeight - 120, Math.max(84, toastRect.top + Math.min(toastRect.height / 2, 48)));
+  const colors = ["#356df3", "#1d8a70", "#bc6b19", "#7c54d3", "#d95c49", "#f3b246"];
+
+  for (let index = 0; index < 18; index += 1) {
+    const spark = document.createElement("span");
+    const angle = ((Math.PI * 2) / 18) * index + Math.random() * 0.24;
+    const distance = 52 + Math.random() * 66;
+    spark.className = "celebration-spark";
+    spark.style.left = `${originX}px`;
+    spark.style.top = `${originY}px`;
+    spark.style.setProperty("--dx", `${Math.cos(angle) * distance}px`);
+    spark.style.setProperty("--dy", `${Math.sin(angle) * distance}px`);
+    spark.style.setProperty("--spark-size", `${8 + Math.random() * 10}px`);
+    spark.style.setProperty("--spark-color", colors[index % colors.length]);
+    spark.addEventListener("animationend", () => spark.remove(), { once: true });
+    layer.appendChild(spark);
+  }
 }
 
 function syncActiveSessionStorage() {
@@ -1385,3 +1777,10 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 }
+
+
+
+
+
+
+

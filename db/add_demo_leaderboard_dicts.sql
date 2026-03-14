@@ -24,10 +24,10 @@ ON DUPLICATE KEY UPDATE
 INSERT INTO dict_college (
   college_id, school_id, college_code, college_name, is_enabled
 ) VALUES
-  (1, 1, 'HUBU-CS', 'School of Computer Science', 1),
-  (2, 1, 'HUBU-ECON', 'School of Economics', 1),
-  (3, 2, 'WUST-CS', 'School of Computer Science and Technology', 1),
-  (4, 2, 'WUST-MATERIALS', 'School of Materials and Metallurgy', 1)
+  (1, 1, 'HUBU-MJC', 'Manchester Joint College', 1),
+  (2, 1, 'HUBU-BIZ', 'Business School', 1),
+  (3, 2, 'WUST-CSC', 'School of Computer Science and Technology', 1),
+  (4, 2, 'WUST-LIT', 'School of Liberal Arts', 1)
 ON DUPLICATE KEY UPDATE
   college_name = VALUES(college_name),
   school_id = VALUES(school_id),
