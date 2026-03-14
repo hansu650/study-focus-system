@@ -1,0 +1,24 @@
+﻿<svg width="160" height="160" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="penguinBody" x1="34" y1="18" x2="124" y2="142" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1E293B"/>
+      <stop offset="1" stop-color="#0F172A"/>
+    </linearGradient>
+    <linearGradient id="penguinBelly" x1="55" y1="52" x2="104" y2="126" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#DCEAF8"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="80" cy="84" rx="48" ry="58" fill="url(#penguinBody)"/>
+  <ellipse cx="80" cy="93" rx="28" ry="39" fill="url(#penguinBelly)"/>
+  <ellipse cx="64" cy="43" rx="7" ry="9" fill="#0F172A"/>
+  <ellipse cx="96" cy="43" rx="7" ry="9" fill="#0F172A"/>
+  <circle cx="66" cy="44" r="2.3" fill="#FFFFFF"/>
+  <circle cx="98" cy="44" r="2.3" fill="#FFFFFF"/>
+  <path d="M79.5 53L94 60.5L79.5 68L65 60.5L79.5 53Z" fill="#F59E0B"/>
+  <path d="M33 80C19 72 18 58 24 48C29 40 39 38 48 41C39 52 36 64 33 80Z" fill="#153E75" opacity="0.88"/>
+  <path d="M127 80C141 72 142 58 136 48C131 40 121 38 112 41C121 52 124 64 127 80Z" fill="#153E75" opacity="0.88"/>
+  <ellipse cx="61" cy="134" rx="15" ry="8" fill="#F97316"/>
+  <ellipse cx="99" cy="134" rx="15" ry="8" fill="#F97316"/>
+  <circle cx="80" cy="79" r="70" stroke="#FFFFFF" stroke-opacity="0.14" stroke-width="2"/>
+</svg>

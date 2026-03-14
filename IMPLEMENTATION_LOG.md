@@ -337,3 +337,7 @@ Record completed backend, frontend, and desktop-guard milestones, plus debugging
 1. Extended the Electron guard so website monitoring now also inspects visible browser window titles for blocked domain keywords such as `bilibili` and `youtube`.
 2. Added desktop popup alerts for blocked app and blocked site violations so the user gets an immediate warning window when focus rules are broken.
 3. Updated the renderer guard flow so both blocked apps and blocked sites now end the session with abandon-style clearing and zero reward.
+## Sprint 2 Update - Relaxed Full-Screen Test Policy - 2026-03-12
+1. Adjusted the Electron focus-window policy so the app no longer pins itself above every other window during testing.
+2. FULL_LOCK still uses full-screen presentation, but users can now Alt+Tab away to deliberately open blocked apps or blocked websites for validation.
+3. This keeps the demo visually strong while making manual guard testing practical.

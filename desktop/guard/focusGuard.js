@@ -340,8 +340,10 @@ function applyWindowPolicy(windowRef, lockMode) {
     return;
   }
 
-  windowRef.setAlwaysOnTop(true, "screen-saver");
-  windowRef.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // Keep the focus window visually prominent, but do not pin it above every app.
+  // This lets the user switch away to launch blocked apps or websites for testing.
+  windowRef.setAlwaysOnTop(false);
+  windowRef.setVisibleOnAllWorkspaces(false);
 
   if (lockMode === "FULL_LOCK") {
     windowRef.setFullScreen(true);
@@ -385,6 +387,7 @@ function focusWindow(windowRef, lockMode) {
 
   windowRef.show();
   windowRef.focus();
+  windowRef.moveTop();
   windowRef.flashFrame(true);
   setTimeout(() => {
     if (!windowRef.isDestroyed()) {
