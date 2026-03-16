@@ -188,6 +188,7 @@ function bootstrap() {
     return;
   }
 
+  ensureHeadlineVisual();
   injectPenguinBrandBadge();
   const loaderBlocksMotion = initializePenguinLoader();
   if (!loaderBlocksMotion) {
@@ -210,9 +211,8 @@ function applyPageMeta() {
   elements.headlineEyebrow.textContent = meta.eyebrow;
   elements.headlineTitle.textContent = meta.title;
   elements.headlineLead.textContent = meta.lead;
-  elements.headlineTags.innerHTML = meta.tags
-    .map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`)
-    .join("");
+  elements.headlineTags.innerHTML = "";
+  elements.headlineTags.hidden = true;
 }
 
 function enforceRouteBoundary() {
@@ -247,6 +247,22 @@ function injectPenguinBrandBadge() {
       <div class="penguin-brand-badge" aria-hidden="true">
         <img src="./assets/penguin-mark.svg" alt="" />
       </div>
+    `
+  );
+}
+
+function ensureHeadlineVisual() {
+  const banner = document.querySelector(".headline-banner");
+  const copy = banner?.querySelector(".headline-copy");
+
+  if (!banner || !copy || banner.querySelector(".headline-visual")) {
+    return;
+  }
+
+  copy.insertAdjacentHTML(
+    "afterend",
+    `
+      <div class="headline-visual" aria-hidden="true"></div>
     `
   );
 }
