@@ -10,7 +10,22 @@
   lastDemoUsername: "study_focus_last_demo_username",
 };
 
-const DEFAULT_API_BASE = "http://127.0.0.1:8000/api/v1";
+function getDefaultApiBase() {
+  const { hostname, origin, port, protocol } = window.location;
+  const isLocalHost = hostname === "127.0.0.1" || hostname === "localhost";
+
+  if (protocol === "file:" || !origin || origin === "null") {
+    return "http://127.0.0.1:8000/api/v1";
+  }
+
+  if (isLocalHost && port !== "8000") {
+    return "http://127.0.0.1:8000/api/v1";
+  }
+
+  return `${origin}/api/v1`;
+}
+
+const DEFAULT_API_BASE = getDefaultApiBase();
 const DEFAULT_DEMO_PASSWORD = "StudyFocus123!";
 const DEFAULT_LOGIN_DEMO_USERNAME = "hubu_mjc_se_101";
 const CURRENT_PAGE = document.body.dataset.page || "landing";
