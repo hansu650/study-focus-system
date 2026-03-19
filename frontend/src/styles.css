@@ -4090,3 +4090,511 @@ body[data-page] .guard-summary-panel::after {
     left: 1rem;
   }
 }
+
+/* Sprint 4 learning and focus overrides */
+body:not([data-page="landing"]) .rail-brand,
+body:not([data-page="landing"]) .rail-reference,
+body:not([data-page="landing"]) .headline-banner,
+body:not([data-page="landing"]) .quick-strip {
+  display: none !important;
+}
+
+body:not([data-page="landing"]) .page-shell {
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
+body:not([data-page="landing"]) .dashboard-stage {
+  display: flex !important;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+body:not([data-page="landing"]) .dashboard-workbench {
+  order: 1;
+}
+
+body:not([data-page="landing"]) .dashboard-overview {
+  order: 2;
+  gap: 0.9rem;
+}
+
+body:not([data-page="learning"]) .dashboard-overview {
+  grid-template-columns: 1fr;
+}
+
+body:not([data-page="landing"]) .profile-card {
+  min-height: 0;
+}
+
+body:not([data-page="landing"]) .metric-panel,
+body:not([data-page="landing"]) .points-panel,
+body:not([data-page="landing"]) .minutes-panel,
+body:not([data-page="landing"]) .guard-summary-panel {
+  grid-template-columns: minmax(150px, 220px) minmax(0, 1fr) !important;
+  gap: 0.8rem 1rem;
+  align-items: center;
+  min-height: 0;
+  padding: 1rem 1.15rem;
+}
+
+body:not([data-page="landing"]) .metric-panel::before,
+body:not([data-page="landing"]) .points-panel::before,
+body:not([data-page="landing"]) .minutes-panel::before,
+body:not([data-page="landing"]) .guard-summary-panel::before,
+body:not([data-page="landing"]) .metric-panel::after,
+body:not([data-page="landing"]) .points-panel::after,
+body:not([data-page="landing"]) .minutes-panel::after,
+body:not([data-page="landing"]) .guard-summary-panel::after {
+  display: none !important;
+}
+
+body:not([data-page="landing"]) .metric-panel strong,
+body:not([data-page="landing"]) .points-panel strong,
+body:not([data-page="landing"]) .minutes-panel strong,
+body:not([data-page="landing"]) .guard-summary-panel strong {
+  font-size: clamp(1.75rem, 2.7vw, 2.4rem);
+  color: var(--ink);
+  letter-spacing: -0.03em;
+}
+
+body:not([data-page="landing"]) .metric-panel p,
+body:not([data-page="landing"]) .points-panel p,
+body:not([data-page="landing"]) .minutes-panel p,
+body:not([data-page="landing"]) .guard-summary-panel p,
+body:not([data-page="landing"]) #desktop-guard-note,
+body:not([data-page="landing"]) #focus-live-status,
+body:not([data-page="landing"]) .leaderboard-context {
+  margin: 0;
+  max-width: none;
+}
+
+body[data-page="learning"] .dashboard-overview {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+body[data-page="learning"] .profile-card {
+  grid-column: 1 / -1;
+}
+
+body[data-page="learning"] .learning-card {
+  min-height: 0;
+}
+
+.learning-manual-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.learning-manual-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.learning-manual-grid > div {
+  padding: 1rem 1.05rem;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.54);
+  border: 1px solid rgba(29, 138, 112, 0.12);
+}
+
+.learning-manual-grid p,
+.learning-manual-intro {
+  margin: 0;
+}
+
+.question-quiz-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.question-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.daily-question-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.daily-question-options {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.daily-question-option {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.85rem;
+  align-items: start;
+  padding: 0.95rem 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.daily-question-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.daily-question-option-badge {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: #1f2c45;
+  background: rgba(53, 109, 243, 0.1);
+}
+
+.daily-question-option-copy {
+  line-height: 1.55;
+}
+
+.daily-question-option:has(input:checked) {
+  border-color: rgba(29, 138, 112, 0.45);
+  box-shadow: 0 12px 24px rgba(29, 138, 112, 0.12);
+  transform: translateY(-1px);
+}
+
+.daily-question-option.is-correct {
+  border-color: rgba(29, 138, 112, 0.5);
+  background: rgba(225, 246, 239, 0.85);
+}
+
+.daily-question-option.is-wrong {
+  border-color: rgba(210, 77, 87, 0.44);
+  background: rgba(255, 238, 238, 0.88);
+}
+
+.daily-question-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.daily-question-actions .hint-text {
+  margin: 0;
+  flex: 1;
+}
+
+body[data-page="focus"] .focus-top-grid {
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  align-items: stretch;
+}
+
+.focus-plan-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 48rem;
+}
+
+.focus-plan-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+}
+
+.focus-plan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.focus-plan-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  align-items: stretch;
+}
+
+.focus-plan-item {
+  width: 100%;
+  border: none;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.8rem;
+  align-items: center;
+  padding: 0.85rem 0.9rem;
+  border-radius: 16px;
+  text-align: left;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+}
+
+.focus-plan-mark {
+  width: 1.45rem;
+  height: 1.45rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  color: #1d8a70;
+  font-weight: 700;
+}
+
+.focus-plan-copy {
+  line-height: 1.45;
+}
+
+.focus-plan-item.is-done .focus-plan-mark {
+  border-color: rgba(29, 138, 112, 0.48);
+  background: #1d8a70;
+  color: #ffffff;
+}
+
+.focus-plan-item.is-done .focus-plan-copy {
+  text-decoration: line-through;
+  opacity: 0.64;
+}
+
+.focus-plan-delete {
+  border: none;
+  border-radius: 16px;
+  padding: 0.85rem 1rem;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.18);
+  color: #b42318;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.focus-plan-delete:hover {
+  background: rgba(255, 240, 240, 0.92);
+}
+
+.guard-consent-actions {
+  display: flex;
+  margin-top: 0.85rem;
+}
+
+.guard-consent-actions .ghost-button {
+  width: 100%;
+}
+
+body.browser-violation-open {
+  overflow: hidden;
+}
+
+.browser-violation-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgba(15, 23, 42, 0.28);
+  backdrop-filter: blur(10px);
+}
+
+.browser-violation-modal[hidden] {
+  display: none;
+}
+
+.browser-violation-modal__card {
+  width: min(100%, 34rem);
+  display: grid;
+  gap: 1rem;
+  padding: 1.4rem;
+  border-radius: 24px;
+}
+
+.browser-violation-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.browser-violation-modal__head h3 {
+  margin: 0;
+}
+
+.browser-violation-modal__close {
+  border: none;
+  background: transparent;
+  color: #52607a;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.browser-violation-modal__body {
+  margin: 0;
+  white-space: pre-line;
+  line-height: 1.65;
+  color: #334155;
+}
+
+.browser-violation-modal__action {
+  justify-self: end;
+  min-width: 7rem;
+}
+
+@media (max-width: 1100px) {
+  body:not([data-page="landing"]) .page-shell,
+  body[data-page="learning"] .dashboard-overview,
+  .learning-manual-grid,
+  body[data-page="focus"] .focus-top-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body:not([data-page="landing"]) .metric-panel,
+  body:not([data-page="landing"]) .points-panel,
+  body:not([data-page="landing"]) .minutes-panel,
+  body:not([data-page="landing"]) .guard-summary-panel,
+  .focus-plan-row,
+  .question-header-actions,
+  .daily-question-actions,
+  .focus-plan-form {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .daily-question-actions .hint-text {
+    width: 100%;
+  }
+}
+
+
+/* Sprint 4 round 2 page routing polish */
+body[data-page="landing"] .rail-brand,
+body[data-page="landing"] .rail-reference,
+body[data-page="landing"] .headline-banner,
+body[data-page="landing"] .quick-strip {
+  display: none !important;
+}
+
+body[data-page="landing"] .page-shell {
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
+body[data-page="landing"] .content-stage {
+  align-content: start;
+}
+
+body[data-page="home"] .dashboard-stage,
+body[data-page="focus"] .dashboard-stage {
+  display: flex !important;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+body[data-page="home"] .dashboard-hub,
+body[data-page="focus"] .dashboard-workbench {
+  order: 1;
+}
+
+body[data-page="home"] .dashboard-overview,
+body[data-page="focus"] .dashboard-overview {
+  order: 2;
+}
+
+body[data-page="home"] .dashboard-workbench {
+  display: none !important;
+}
+
+body[data-page="focus"] .dashboard-hub,
+body[data-page="focus"] .learning-card,
+body[data-page="focus"] .leaderboard-card-shell,
+body[data-page="focus"] .redeem-card,
+body[data-page="focus"] .feedback-card,
+body[data-page="focus"] .workbench-side {
+  display: none !important;
+}
+
+body[data-page="focus"] .dashboard-workbench,
+body[data-page="focus"] .workbench-main {
+  grid-template-columns: 1fr;
+}
+
+.focus-guide-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.focus-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.focus-guide-grid > div {
+  padding: 1rem 1.05rem;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.54);
+  border: 1px solid rgba(29, 138, 112, 0.12);
+}
+
+.focus-guide-grid p,
+.focus-guide-intro {
+  margin: 0;
+}
+
+.rewards-guide-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.rewards-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.rewards-guide-grid > div {
+  padding: 1rem 1.05rem;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.54);
+  border: 1px solid rgba(188, 122, 49, 0.14);
+}
+
+.rewards-guide-grid p,
+.rewards-guide-intro {
+  margin: 0;
+}
+
+@media (max-width: 1100px) {
+  body[data-page="landing"] .page-shell,
+  .focus-guide-grid,
+  .rewards-guide-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Sprint 4 round 3 overview cleanup */
+body:not([data-page="landing"]) .dashboard-overview {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+body:not([data-page="landing"]) .profile-card {
+  grid-column: 1 / -1;
+}
+
+body:not([data-page="landing"]) .guard-summary-panel {
+  display: none !important;
+}
+
+@media (max-width: 1100px) {
+  body:not([data-page="landing"]) .dashboard-overview {
+    grid-template-columns: 1fr !important;
+  }
+}

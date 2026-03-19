@@ -41,6 +41,13 @@ pwsh ./scripts/init_db.ps1 -MysqlExe mysql -DbHost 127.0.0.1 -DbPort 3306 -DbUse
 pwsh ./scripts/seed_demo.ps1 -MysqlExe mysql -DbHost 127.0.0.1 -DbPort 3306 -DbUser root -DbPassword <your-password>
 ```
 
+`seed_demo.ps1` now loads the base dictionaries, the daily-question attempt table migration, and the richer showcase data used for rankings, rewards, feedback, and redeem demos.
+
+If you only want to refresh the ranking/showcase records after the schema already exists, you can also run:
+```bash
+pwsh ./scripts/seed_leaderboard_demo.ps1 -MysqlExe mysql -DbHost 127.0.0.1 -DbPort 3306 -DbUser root -DbPassword <your-password>
+```
+
 ## 5. Start service manually
 ```bash
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
@@ -71,9 +78,11 @@ sudo systemctl reload nginx
 1. `GET /health` returns `{"status":"ok"}`.
 2. `/docs` is reachable.
 3. Register -> Login -> Get profile flow works.
+4. Rankings, Break Space, Rewards, and Feedback all show seeded showcase content after the seed step.
 
 ## 9. Troubleshooting
 1. `Access denied for user`: check DB user/password/privileges.
 2. `ModuleNotFoundError`: verify active env and dependency install.
 3. `401 Unauthorized`: token invalid/expired or wrong `SECRET_KEY`.
 4. AI call failure: check OpenAI-compatible endpoint and key.
+5. Empty rankings or empty demo tables: rerun `seed_demo.ps1` or `seed_leaderboard_demo.ps1` against the target database.

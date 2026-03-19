@@ -106,3 +106,28 @@ Completed in `desktop/`:
 3. Add automated API tests and frontend smoke tests
 4. Add stronger desktop protections such as foreground-window checks and optional terminate-on-violation mode
 5. Upgrade the frontend MVP into Vue 3 + Electron packaging when the flow is frozen
+
+## 13. Current Delivery Mode - 2026-03-18
+1. The project now supports two parallel focus-monitor modes:
+   - Website mode: detect leaving the study page, switching tabs, or switching windows after user consent
+   - Desktop mode: Electron-based app/site monitoring after user consent
+2. Website mode is the deployable cloud path for the Tencent Cloud web release.
+3. Desktop mode remains the stronger local option for demonstrations or stricter anti-distraction checks.
+4. Both modes now require explicit user permission before monitoring starts.
+
+## 14. Current UI Direction - 2026-03-18
+1. The renamed Learning page remains the primary working surface after login.
+2. Learning page is being reduced to the essentials: core question content plus AI chat, without extra quiz chrome.
+3. Feedback copy is being simplified to shorter teacher-demo wording.
+4. The local plan notebook is now treated as a lightweight session checklist with completion and deletion actions.
+5. The website-mode leave-page grace window is now set to 15 seconds for less aggressive interruption during manual testing.
+6. Website mode now uses an explicit abandon popup on return so browser-side violations are visible in demos instead of relying only on background toasts.
+7. The renamed Learning page no longer exposes a public `Lock Mode` selector; web demos now start with the default lock behavior behind the scenes to keep the form simpler.
+8. The former daily-question page is now presented as Break Space so the main work surface can own the `Learning` name without duplicate navigation labels.
+9. AI chat now needs a stability layer on top of the provider integration so temporary empty-response failures do not immediately break the web demo.
+10. The Learning page should prefer automatic completion when the timer reaches zero, so the demo flow does not depend on an extra manual completion button.
+
+## 15. Demo Showcase Data - 2026-03-19
+1. Ranking demos now need richer seed data so the leaderboard is visually convincing during local testing and cloud deployment.
+2. The default demo seed path should populate every major business table, not just users, focus sessions, and point ledger rows.
+3. The deployment runbook should explicitly mention the showcase seeding path so Tencent Cloud can be refreshed without manual SQL guessing.

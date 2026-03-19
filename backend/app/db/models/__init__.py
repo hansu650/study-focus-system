@@ -1,6 +1,7 @@
-"""Import ORM models so metadata is fully registered."""
+﻿"""Import ORM models so metadata is fully registered."""
 
 from app.db.models.base import Base
+from app.db.models.daily_question import DailyQuestionAttempt
 from app.db.models.dicts import DictCollege, DictRegion, DictSchool
 from app.db.models.feedback import FeedbackMessage
 from app.db.models.focus import FocusSession
@@ -10,6 +11,7 @@ from app.db.models.user import AppUser
 
 __all__ = [
     "Base",
+    "DailyQuestionAttempt",
     "DictRegion",
     "DictSchool",
     "DictCollege",

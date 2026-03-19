@@ -1,4 +1,4 @@
-"""AI provider adapter.
+﻿"""AI provider adapter.
 
 Supports OpenAI-compatible and Anthropic-compatible providers.
 """
@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from http.client import HTTPConnection, HTTPException, HTTPSConnection, HTTPResponse
+from http.client import HTTPConnection, HTTPException, HTTPSConnection
 from json import JSONDecodeError
 from urllib.parse import urlparse
 
@@ -61,29 +61,60 @@ class AIService:
 
     @staticmethod
     def _chat_openai(question: str, system_prompt: str) -> str:
-        payload = {
-            "model": settings.ai_model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": question},
-            ],
-            "temperature": 0.4,
+        headers = {
+            "Content-Type": "application/json; charset=utf-8",
+            "Authorization": f"Bearer {settings.resolved_ai_api_key}",
         }
+        errors: list[str] = []
 
-        endpoint = AIService._build_openai_endpoint(settings.ai_api_base)
-        body = AIService._post_json(
-            endpoint=endpoint,
-            payload=payload,
-            headers={
-                "Content-Type": "application/json; charset=utf-8",
-                "Authorization": f"Bearer {settings.resolved_ai_api_key}",
-            },
-        )
+        attempts = [
+            (
+                AIService._build_openai_endpoint(settings.ai_api_base),
+                {
+                    "model": settings.ai_model,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": question},
+                    ],
+                    "temperature": 0.4,
+                },
+            ),
+            (
+                AIService._build_openai_responses_endpoint(settings.ai_api_base),
+                {
+                    "model": settings.ai_model,
+                    "instructions": system_prompt,
+                    "input": question,
+                    "temperature": 0.4,
+                },
+            ),
+        ]
 
-        answer = AIService._extract_openai_answer(body)
-        if not answer:
-            raise RuntimeError("AI provider returned empty answer.")
-        return answer
+        for endpoint, payload in attempts:
+            try:
+                body = AIService._post_json(
+                    endpoint=endpoint,
+                    payload=payload,
+                    headers=headers,
+                )
+            except RuntimeError as exc:
+                errors.append(str(exc))
+                continue
+
+            answer = AIService._extract_openai_answer(body)
+            if answer:
+                return answer
+
+            provider_error = AIService._extract_provider_error(body)
+            if provider_error:
+                errors.append(provider_error)
+            else:
+                errors.append(f"AI provider returned no readable answer from {endpoint}.")
+
+        detail = "; ".join(dict.fromkeys(errors))
+        if detail:
+            raise RuntimeError(detail)
+        raise RuntimeError("AI provider returned no readable answer after chat/completions and responses fallback.")
 
     @staticmethod
     def _chat_anthropic(question: str, system_prompt: str) -> str:
@@ -179,23 +210,51 @@ class AIService:
     @staticmethod
     def _extract_openai_answer(body: dict) -> str:
         choices = body.get("choices") or []
-        if not choices:
-            return ""
+        if choices:
+            for choice in choices:
+                if not isinstance(choice, dict):
+                    continue
 
-        message = choices[0].get("message", {}) if isinstance(choices[0], dict) else {}
-        content = message.get("content", "")
+                message_answer = AIService._extract_message_answer(choice.get("message"))
+                if message_answer:
+                    return message_answer
 
-        if isinstance(content, str):
-            return content.strip()
+                delta_answer = AIService._extract_message_answer(choice.get("delta"))
+                if delta_answer:
+                    return delta_answer
 
-        if isinstance(content, list):
-            texts = []
-            for item in content:
-                if isinstance(item, dict) and item.get("type") == "text":
-                    text = str(item.get("text", "")).strip()
-                    if text:
-                        texts.append(text)
-            return "\n".join(texts).strip()
+                content_answer = AIService._extract_content_answer(choice.get("content"))
+                if content_answer:
+                    return content_answer
+
+                for key in ("text", "output_text", "answer"):
+                    value = choice.get(key)
+                    if isinstance(value, str) and value.strip():
+                        return value.strip()
+
+        for key in ("output_text", "answer", "text", "completion"):
+            value = body.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+
+        message_answer = AIService._extract_message_answer(body.get("message"))
+        if message_answer:
+            return message_answer
+
+        content_answer = AIService._extract_content_answer(body.get("content"))
+        if content_answer:
+            return content_answer
+
+        output_answer = AIService._extract_output_answer(body.get("output"))
+        if output_answer:
+            return output_answer
+
+        for key in ("data", "result", "response"):
+            nested = body.get(key)
+            if isinstance(nested, dict):
+                nested_answer = AIService._extract_openai_answer(nested)
+                if nested_answer:
+                    return nested_answer
 
         return ""
 
@@ -216,8 +275,96 @@ class AIService:
         if isinstance(output_text, str) and output_text.strip():
             return output_text.strip()
 
-        # Fallback: some providers still return OpenAI-like structure.
         return AIService._extract_openai_answer(body)
+
+    @staticmethod
+    def _extract_message_answer(message: object) -> str:
+        if isinstance(message, str) and message.strip():
+            return message.strip()
+
+        if isinstance(message, dict):
+            return AIService._extract_content_answer(message.get("content", ""))
+
+        return ""
+
+    @staticmethod
+    def _extract_content_answer(content: object) -> str:
+        if isinstance(content, str):
+            return content.strip()
+
+        if isinstance(content, dict):
+            for key in ("text", "content", "answer"):
+                extracted = AIService._extract_content_answer(content.get(key))
+                if extracted:
+                    return extracted
+            return ""
+
+        if isinstance(content, list):
+            texts: list[str] = []
+            for item in content:
+                if isinstance(item, dict):
+                    item_type = str(item.get("type", "")).strip().lower()
+                    if item_type in {"text", "output_text", "input_text"}:
+                        text = str(item.get("text", "")).strip()
+                        if text:
+                            texts.append(text)
+                            continue
+
+                    extracted = AIService._extract_content_answer(item.get("content"))
+                    if extracted:
+                        texts.append(extracted)
+                        continue
+
+                    text_value = str(item.get("text", "")).strip()
+                    if text_value:
+                        texts.append(text_value)
+                elif isinstance(item, str) and item.strip():
+                    texts.append(item.strip())
+
+            return "\n".join(texts).strip()
+
+        return ""
+
+    @staticmethod
+    def _extract_output_answer(output: object) -> str:
+        if isinstance(output, list):
+            texts: list[str] = []
+            for item in output:
+                if not isinstance(item, dict):
+                    continue
+
+                extracted = AIService._extract_content_answer(item.get("content"))
+                if extracted:
+                    texts.append(extracted)
+                    continue
+
+                for key in ("text", "output_text"):
+                    value = item.get(key)
+                    if isinstance(value, str) and value.strip():
+                        texts.append(value.strip())
+                        break
+
+            return "\n".join(texts).strip()
+
+        return ""
+
+    @staticmethod
+    def _extract_provider_error(body: dict) -> str:
+        error = body.get("error")
+        if isinstance(error, str) and error.strip():
+            return error.strip()
+
+        if isinstance(error, dict):
+            for key in ("message", "detail", "type"):
+                value = error.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+
+        detail = body.get("detail")
+        if isinstance(detail, str) and detail.strip():
+            return detail.strip()
+
+        return ""
 
     @staticmethod
     def _build_openai_endpoint(base_url: str) -> str:
@@ -225,6 +372,13 @@ class AIService:
         if base.endswith("/chat/completions"):
             return base
         return f"{base}/chat/completions"
+
+    @staticmethod
+    def _build_openai_responses_endpoint(base_url: str) -> str:
+        base = base_url.rstrip("/")
+        if base.endswith("/responses"):
+            return base
+        return f"{base}/responses"
 
     @staticmethod
     def _build_anthropic_endpoint(base_url: str) -> str:

@@ -1,7 +1,8 @@
-import json
+﻿import json
 import unittest
 from unittest.mock import patch
 
+from app.core.config import settings
 from app.services.ai_service import AIService
 
 
@@ -48,7 +49,7 @@ class AIServiceTransportTests(unittest.TestCase):
         with patch("app.services.ai_service.HTTPSConnection", _FakeConnection):
             body = AIService._post_json(
                 endpoint="https://example.com/v1/chat/completions",
-                payload={"question": "你是谁"},
+                payload={"question": "你是谁？"},
                 headers={"Authorization": "Bearer demo-key"},
             )
 
@@ -58,7 +59,35 @@ class AIServiceTransportTests(unittest.TestCase):
         self.assertEqual(sent.method, "POST")
         self.assertEqual(sent.path, "/v1/chat/completions")
         self.assertIn("application/json; charset=utf-8", sent.headers["Content-Type"])
-        self.assertIn("你是谁", sent.body.decode("utf-8"))
+        self.assertIn("你是谁？", sent.body.decode("utf-8"))
+
+    def test_extract_openai_answer_supports_choice_text_payload(self) -> None:
+        body = {"choices": [{"text": "legacy completion text"}]}
+        self.assertEqual(AIService._extract_openai_answer(body), "legacy completion text")
+
+    def test_chat_openai_falls_back_to_responses_when_primary_answer_is_empty(self) -> None:
+        calls: list[str] = []
+
+        def fake_post(endpoint: str, payload: dict, headers: dict[str, str]) -> dict:
+            calls.append(endpoint)
+            if endpoint.endswith("/chat/completions"):
+                return {"choices": [{"message": {"content": ""}}]}
+            return {"output_text": "fallback answer"}
+
+        with patch.object(settings, "ai_api_base", "https://example.com/v1"):
+            with patch.object(settings, "ai_api_key", "demo-key"):
+                with patch.object(settings, "ai_model", "gpt-4o-mini"):
+                    with patch.object(AIService, "_post_json", side_effect=fake_post):
+                        answer = AIService._chat_openai("hello", "You are helpful.")
+
+        self.assertEqual(answer, "fallback answer")
+        self.assertEqual(
+            calls,
+            [
+                "https://example.com/v1/chat/completions",
+                "https://example.com/v1/responses",
+            ],
+        )
 
 
 if __name__ == "__main__":

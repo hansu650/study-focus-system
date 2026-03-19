@@ -7,6 +7,10 @@
   leaderboardScope: "study_focus_leaderboard_scope",
   leaderboardSchoolId: "study_focus_leaderboard_school_id",
   leaderboardCollegeId: "study_focus_leaderboard_college_id",
+  desktopConsent: "study_focus_desktop_consent",
+  browserConsent: "study_focus_browser_consent",
+  browserAwayState: "study_focus_browser_away_state",
+  browserViolationNotice: "study_focus_browser_violation_notice",
   lastDemoUsername: "study_focus_last_demo_username",
 };
 
@@ -28,7 +32,47 @@ function getDefaultApiBase() {
 const DEFAULT_API_BASE = getDefaultApiBase();
 const DEFAULT_DEMO_PASSWORD = "StudyFocus123!";
 const DEFAULT_LOGIN_DEMO_USERNAME = "hubu_mjc_se_101";
+const APP_PAGE_VERSION = "sprint4r17";
+const FOCUS_PLAN_STORAGE_PREFIX = "study_focus_focus_plan_";
 const CURRENT_PAGE = document.body.dataset.page || "landing";
+
+function ensureApiV1Suffix(value) {
+  const raw = String(value || "").trim().replace(/\/+$/u, "");
+  if (!raw) {
+    return "";
+  }
+
+  if (raw.endsWith("/api/v1")) {
+    return raw;
+  }
+
+  if (raw.endsWith("/api")) {
+    return `${raw}/v1`;
+  }
+
+  return `${raw}/api/v1`;
+}
+
+function normalizeApiBaseForCurrentHost(value) {
+  const raw = String(value || "").trim().replace(/\/+$/u, "");
+  const { hostname, origin, protocol } = window.location;
+  const isLocalPage = protocol === "file:" || hostname === "127.0.0.1" || hostname === "localhost";
+  const isLocalApi = raw.includes("127.0.0.1:8000") || raw.includes("localhost:8000");
+
+  if (isLocalPage) {
+    return isLocalApi ? ensureApiV1Suffix(raw) : "http://127.0.0.1:8000/api/v1";
+  }
+
+  if (!raw || isLocalApi) {
+    return `${origin}/api/v1`;
+  }
+
+  if (raw.startsWith("/")) {
+    return `${origin}${raw}`;
+  }
+
+  return ensureApiV1Suffix(raw);
+}
 
 const PAGE_META = {
   landing: {
@@ -48,12 +92,12 @@ const PAGE_META = {
     tags: ["Overview", "Quick Jumps", "Campus Metrics", "Cleaner Demo", "Multi-Page"],
   },
   focus: {
-    browserTitle: "Focus Lab | Study Focus Atlas",
-    eyebrow: "Focus Lab",
-    title: "One screen, one job: run the session and let the guard own the moment.",
+    browserTitle: "Learning | Study Focus Atlas",
+    eyebrow: "Learning",
+    title: "Use one learning page to run the timer, plan tasks, and review guard status.",
     lead:
-      "This route borrows the single-purpose clarity of Pomofocus, then adds desktop guard status, resume flow, and violation logs.",
-    tags: ["Timer", "Resume", "Guard Events", "Blocked Apps", "Blocked Sites"],
+      "This route keeps the timer, planner, consent gate, and guard log together so the focus flow is easier to explain and use.",
+    tags: ["Learning", "Timer", "Plan Notebook", "Guard Events", "Blocked Sites"],
   },
   rankings: {
     browserTitle: "Rankings | Study Focus Atlas",
@@ -64,8 +108,8 @@ const PAGE_META = {
     tags: ["School Scope", "College Scope", "Day Month Year", "Point Ledger", "Demo Ready"],
   },
   learning: {
-    browserTitle: "Learning | Study Focus Atlas",
-    eyebrow: "Learning Corner",
+    browserTitle: "Break Space | Study Focus Atlas",
+    eyebrow: "Break Space",
     title: "Keep the daily question and AI break-space together instead of burying them under operations.",
     lead:
       "This page is calmer by design: question at the top, chat below, and no ranking or redeem noise fighting for attention.",
@@ -90,7 +134,7 @@ const PAGE_META = {
 };
 
 const state = {
-  apiBase: localStorage.getItem(STORAGE_KEYS.apiBase) || DEFAULT_API_BASE,
+  apiBase: normalizeApiBaseForCurrentHost(localStorage.getItem(STORAGE_KEYS.apiBase) || DEFAULT_API_BASE),
   token: localStorage.getItem(STORAGE_KEYS.token) || "",
   user: readJson(STORAGE_KEYS.user),
   activeSession: readJson(STORAGE_KEYS.activeSession),
@@ -109,12 +153,24 @@ const state = {
   leaderboard: [],
   orders: [],
   feedbacks: [],
+  dailyQuestion: null,
+  focusPlanItems: [],
+  autoCompleteSessionId: 0,
   guardInterruptInFlight: false,
   desktop: {
     available: Boolean(window.studyFocusDesktop?.isAvailable),
+    consent: readDesktopConsentStatus(),
     status: null,
     eventLog: [],
     unsubscribe: null,
+    promptInFlight: false,
+  },
+  web: {
+    consent: readBrowserConsentStatus(),
+    promptInFlight: false,
+    violationTimerId: null,
+    awayStartedAt: 0,
+    awayTrigger: "",
   },
 };
 
@@ -142,11 +198,15 @@ const elements = {
   loginForm: document.querySelector("#login-form"),
   registerForm: document.querySelector("#register-form"),
   focusStartForm: document.querySelector("#focus-start-form"),
-  completeSessionBtn: document.querySelector("#complete-session-btn"),
+  focusPlanForm: document.querySelector("#focus-plan-form"),
+  focusPlanList: document.querySelector("#focus-plan-list"),
   interruptSessionBtn: document.querySelector("#interrupt-session-btn"),
   resumeSessionBtn: document.querySelector("#resume-session-btn"),
   abandonSessionBtn: document.querySelector("#abandon-session-btn"),
   refreshQuestionBtn: document.querySelector("#refresh-question-btn"),
+  dailyQuestionForm: document.querySelector("#daily-question-form"),
+  dailyQuestionOptions: document.querySelector("#daily-question-options"),
+  dailyQuestionResult: document.querySelector("#daily-question-result"),
   aiChatForm: document.querySelector("#ai-chat-form"),
   redeemForm: document.querySelector("#redeem-form"),
   feedbackForm: document.querySelector("#feedback-form"),
@@ -183,21 +243,30 @@ const elements = {
   feedbackList: document.querySelector("#feedback-list"),
   dailyQuestionSubject: document.querySelector("#daily-question-subject"),
   dailyQuestionDifficulty: document.querySelector("#daily-question-difficulty"),
+  dailyQuestionPoints: document.querySelector("#daily-question-points"),
   dailyQuestionTitle: document.querySelector("#daily-question-title"),
   dailyQuestionBody: document.querySelector("#daily-question-body"),
   dailyQuestionHint: document.querySelector("#daily-question-hint"),
   chatHistory: document.querySelector("#chat-history"),
   periodButtons: Array.from(document.querySelectorAll("#leaderboard-period-tabs .period-tab")),
   scopeButtons: Array.from(document.querySelectorAll("#leaderboard-scope-tabs .scope-tab")),
+  desktopConsentBtn: null,
 };
 
-bootstrap();
+void bootstrap();
 
-function bootstrap() {
+async function bootstrap() {
+  state.apiBase = normalizeApiBaseForCurrentHost(state.apiBase);
+  localStorage.setItem(STORAGE_KEYS.apiBase, state.apiBase);
+  ensureDesktopConsentControl();
   bindEvents();
   elements.apiBaseInput.value = state.apiBase;
   prefillFormsFromHistory();
   applyPageMeta();
+
+  if (!state.token) {
+    clearDesktopConsent();
+  }
 
   if (enforceRouteBoundary()) {
     return;
@@ -212,10 +281,27 @@ function bootstrap() {
 
   updateAuthView();
   renderDesktopStatus();
-  void initDesktopBridge();
+  renderFocusPlanner();
+  flushBrowserViolationNotice();
+
+  if (state.token && state.desktop.available) {
+    if (hasDesktopConsent()) {
+      await initDesktopBridge();
+    } else {
+      const consentGranted = await requestDesktopMonitoringConsent({ showSuccessToast: false });
+      if (!consentGranted) {
+        return;
+      }
+    }
+  } else if (state.token && CURRENT_PAGE === "focus" && !hasBrowserMonitoringConsent()) {
+    await requestBrowserMonitoringConsent({ showSuccessToast: false });
+  }
 
   if (state.token) {
-    void refreshDashboard();
+    await refreshDashboard();
+    if (CURRENT_PAGE === "focus") {
+      await handleBrowserModeReturn();
+    }
   }
 }
 
@@ -232,7 +318,12 @@ function applyPageMeta() {
 
 function enforceRouteBoundary() {
   if (state.token && CURRENT_PAGE === "landing") {
-    goToPage("home");
+    goToPage("focus");
+    return true;
+  }
+
+  if (state.token && CURRENT_PAGE === "home") {
+    goToPage("focus");
     return true;
   }
 
@@ -247,6 +338,7 @@ function enforceRouteBoundary() {
 function goToPage(page) {
   const fileName = page === "landing" ? "index.html" : `${page}.html`;
   const nextUrl = new URL(`./${fileName}`, window.location.href);
+  nextUrl.searchParams.set("v", APP_PAGE_VERSION);
   window.location.replace(nextUrl.href);
 }
 
@@ -280,6 +372,32 @@ function ensureHeadlineVisual() {
       <div class="headline-visual" aria-hidden="true"></div>
     `
   );
+}
+
+function ensureDesktopConsentControl() {
+  if (!elements.desktopGuardNote) {
+    return;
+  }
+
+  const existingButton = document.querySelector("#desktop-consent-btn");
+  if (existingButton) {
+    elements.desktopConsentBtn = existingButton;
+    return;
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "guard-consent-actions";
+  actions.hidden = true;
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.id = "desktop-consent-btn";
+  button.className = "ghost-button secondary-tone";
+  button.textContent = "Enable Monitor For This Login";
+  actions.appendChild(button);
+
+  elements.desktopGuardNote.insertAdjacentElement("afterend", actions);
+  elements.desktopConsentBtn = button;
 }
 
 function initializePenguinLoader() {
@@ -448,9 +566,19 @@ function markAllRevealTargetsVisible() {
 function bindEvents() {
   elements.saveApiBaseBtn.addEventListener("click", handleSaveApiBase);
   elements.refreshDashboardBtn.addEventListener("click", () => void refreshDashboard());
-  elements.logoutBtn.addEventListener("click", logout);
+  elements.logoutBtn.addEventListener("click", () => void logout());
   elements.fillRegisterDemoBtn.addEventListener("click", fillRegisterDemoForm);
   elements.fillLoginDemoBtn.addEventListener("click", fillLoginDemoForm);
+
+  if (elements.desktopConsentBtn) {
+    elements.desktopConsentBtn.addEventListener("click", () => void handleEnableDesktopMonitoring());
+  }
+
+  document.addEventListener("visibilitychange", handleBrowserVisibilityChange);
+  window.addEventListener("blur", handleBrowserWindowBlur);
+  window.addEventListener("focus", handleBrowserWindowFocus);
+  window.addEventListener("pageshow", handleBrowserWindowFocus);
+  window.addEventListener("pagehide", handleBrowserPageHide);
 
   elements.loginForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -467,12 +595,45 @@ function bindEvents() {
     void handleStartFocus(event.currentTarget);
   });
 
-  elements.completeSessionBtn.addEventListener("click", () => void settleCurrentSession("complete"));
+  if (elements.focusPlanForm) {
+    elements.focusPlanForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      handleAddFocusPlan(event.currentTarget);
+    });
+  }
+
+  if (elements.focusPlanList) {
+    elements.focusPlanList.addEventListener("click", (event) => {
+      const deleteButton = event.target.closest("[data-plan-delete-id]");
+      if (deleteButton) {
+        deleteFocusPlanItem(deleteButton.dataset.planDeleteId || "");
+        return;
+      }
+
+      const toggleButton = event.target.closest("[data-plan-item-id]");
+      if (!toggleButton) {
+        return;
+      }
+
+      toggleFocusPlanItem(toggleButton.dataset.planItemId || "");
+    });
+  }
+
   elements.interruptSessionBtn.addEventListener("click", () => void settleCurrentSession("interrupt"));
   elements.resumeSessionBtn.addEventListener("click", () => void handleResumeFocus());
   elements.abandonSessionBtn.addEventListener("click", () => void settleCurrentSession("abandon"));
 
-  elements.refreshQuestionBtn.addEventListener("click", () => void loadDailyQuestion());
+  if (elements.refreshQuestionBtn) {
+    elements.refreshQuestionBtn.addEventListener("click", () => void loadDailyQuestion());
+  }
+
+  if (elements.dailyQuestionForm) {
+    elements.dailyQuestionForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      void handleSubmitDailyQuestion(event.currentTarget);
+    });
+  }
+
   elements.aiChatForm.addEventListener("submit", (event) => {
     event.preventDefault();
     void handleAskAi(event.currentTarget);
@@ -541,26 +702,47 @@ function bindEvents() {
 }
 
 async function initDesktopBridge() {
-  if (!state.desktop.available) {
+  if (!state.desktop.available || !hasDesktopConsent()) {
+    disconnectDesktopBridge();
     renderDesktopStatus();
     return;
   }
 
   try {
-    state.desktop.unsubscribe = window.studyFocusDesktop.onGuardEvent((event) => {
-      void handleDesktopGuardEvent(event);
-    });
+    if (!state.desktop.unsubscribe) {
+      state.desktop.unsubscribe = window.studyFocusDesktop.onGuardEvent((event) => {
+        void handleDesktopGuardEvent(event);
+      });
+    }
 
     state.desktop.status = await window.studyFocusDesktop.getStatus();
-    renderDesktopStatus();
   } catch (error) {
     pushGuardEvent({
       type: "guard_bridge_error",
       detectedAt: new Date().toISOString(),
       message: `Desktop bridge failed: ${error.message}`,
     });
-    renderDesktopStatus();
   }
+
+  renderDesktopStatus();
+}
+
+async function handleEnableDesktopMonitoring() {
+  if (state.desktop.available) {
+    await requestDesktopMonitoringConsent();
+    return;
+  }
+
+  await requestBrowserMonitoringConsent();
+}
+
+function disconnectDesktopBridge() {
+  if (typeof state.desktop.unsubscribe === "function") {
+    state.desktop.unsubscribe();
+  }
+
+  state.desktop.unsubscribe = null;
+  state.desktop.status = null;
 }
 
 function updateAuthView() {
@@ -575,11 +757,12 @@ function updateAuthView() {
 
   renderLeaderboardTabs();
   renderRunningSession();
+  renderFocusPlanner();
 }
 
 function handleSaveApiBase() {
   const value = elements.apiBaseInput.value.trim().replace(/\/+$/u, "");
-  state.apiBase = value || DEFAULT_API_BASE;
+  state.apiBase = normalizeApiBaseForCurrentHost(value || DEFAULT_API_BASE);
   localStorage.setItem(STORAGE_KEYS.apiBase, state.apiBase);
   elements.apiBaseInput.value = state.apiBase;
   showToast("API base saved.", "success");
@@ -631,14 +814,30 @@ async function handleLogin(form) {
   state.token = response.access_token;
   localStorage.setItem(STORAGE_KEYS.token, state.token);
   localStorage.setItem(STORAGE_KEYS.lastDemoUsername, payload.username);
+  disconnectDesktopBridge();
+  clearDesktopConsent();
+  state.desktop.eventLog = [];
+  state.dailyQuestion = null;
+  state.focusPlanItems = [];
 
   if (CURRENT_PAGE === "landing") {
-    goToPage("home");
+    goToPage("focus");
     return;
   }
 
   showToast("Login completed.", "success");
   updateAuthView();
+  renderDesktopStatus();
+
+  if (state.desktop.available) {
+    const consentGranted = await requestDesktopMonitoringConsent({ showSuccessToast: false });
+    if (!consentGranted) {
+      return;
+    }
+  } else if (CURRENT_PAGE === "focus") {
+    await requestBrowserMonitoringConsent({ showSuccessToast: false });
+  }
+
   await refreshDashboard();
 }
 
@@ -678,6 +877,8 @@ async function refreshDashboard() {
     state.user = profileResponse;
     localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(profileResponse));
   }
+
+  loadFocusPlanner();
 
   if (!state.leaderboardSchoolId) {
     state.leaderboardSchoolId = Number(profile?.school_id || 0) || 0;
@@ -742,18 +943,22 @@ async function refreshDashboard() {
     state.feedbacks = feedback.items || [];
   }
 
+  state.dailyQuestion = question || null;
+
   renderProfile();
   renderPoints();
   renderSessions();
   renderLedger();
   renderLeaderboardTabs();
   renderLeaderboard();
-  renderDailyQuestion(question);
+  renderDailyQuestion(state.dailyQuestion);
   renderOrders();
   renderFeedback();
   renderRunningSession();
+  renderFocusPlanner();
   await syncDesktopGuard();
 }
+
 async function handleStartFocus(form) {
   if (state.activeSession) {
     showToast("A running session already exists.", "error");
@@ -765,8 +970,22 @@ async function handleStartFocus(form) {
     return;
   }
 
+  if (state.desktop.available) {
+    const consentGranted = await requestDesktopMonitoringConsent({ showSuccessToast: false });
+    if (!consentGranted) {
+      return;
+    }
+  } else {
+    const consentGranted = await requestBrowserMonitoringConsent({ showSuccessToast: false });
+    if (!consentGranted) {
+      showToast("Web focus checking is required before starting a website-mode session.", "error");
+      return;
+    }
+  }
+
   const payload = formDataToObject(new FormData(form));
   payload.planned_minutes = Number(payload.planned_minutes);
+  payload.lock_mode = "APP_BLOCK";
   payload.blocked_apps = parseCsvList(payload.blocked_apps);
   payload.blocked_sites = parseCsvList(payload.blocked_sites);
 
@@ -780,9 +999,14 @@ async function handleStartFocus(form) {
   }
 
   state.activeSession = session;
+  state.autoCompleteSessionId = 0;
   syncActiveSessionStorage();
   await startDesktopGuardForSession(session);
-  showToast("Focus session started.", "success");
+
+  const toastMessage = state.desktop.available
+    ? "Focus session started with desktop monitoring."
+    : "Focus session started with website-mode page checking.";
+  showToast(toastMessage, "success");
   await refreshDashboard();
 }
 
@@ -790,6 +1014,19 @@ async function handleResumeFocus() {
   if (!state.pausedSession) {
     showToast("No interrupted session found.", "error");
     return;
+  }
+
+  if (state.desktop.available) {
+    const consentGranted = await requestDesktopMonitoringConsent({ showSuccessToast: false });
+    if (!consentGranted) {
+      return;
+    }
+  } else {
+    const consentGranted = await requestBrowserMonitoringConsent({ showSuccessToast: false });
+    if (!consentGranted) {
+      showToast("Web focus checking is required before resuming a website-mode session.", "error");
+      return;
+    }
   }
 
   const session = await apiFetch(`/focus-sessions/${state.pausedSession.session_id}/resume`, {
@@ -802,9 +1039,14 @@ async function handleResumeFocus() {
 
   state.activeSession = session;
   state.pausedSession = null;
+  state.autoCompleteSessionId = 0;
   syncActiveSessionStorage();
   await startDesktopGuardForSession(session);
-  showToast("Focus session resumed from the interrupted time.", "success");
+
+  const toastMessage = state.desktop.available
+    ? "Focus session resumed with desktop monitoring."
+    : "Focus session resumed with website-mode page checking.";
+  showToast(toastMessage, "success");
   await refreshDashboard();
 }
 
@@ -836,6 +1078,7 @@ async function settleCurrentSession(action, extraBody = {}, options = {}) {
   if (action === "interrupt") {
     state.activeSession = null;
     state.pausedSession = result;
+    state.autoCompleteSessionId = 0;
     syncActiveSessionStorage();
     await stopDesktopGuard();
     showToast(options.successMessage || "Session interrupted. Resume will continue from the saved time.", "success");
@@ -845,6 +1088,7 @@ async function settleCurrentSession(action, extraBody = {}, options = {}) {
 
   state.activeSession = null;
   state.pausedSession = null;
+  state.autoCompleteSessionId = 0;
   syncActiveSessionStorage();
   await stopDesktopGuard();
   showToast(options.successMessage || `Session ${labelMap[action]}ed.`, "success");
@@ -862,6 +1106,48 @@ async function loadDailyQuestion() {
   showToast("Daily question refreshed.", "success");
 }
 
+async function handleSubmitDailyQuestion(form) {
+  if (!state.dailyQuestion?.question_date) {
+    showToast("No daily question is ready yet.", "error");
+    return;
+  }
+
+  if (state.dailyQuestion?.attempt) {
+    showToast("Today's daily question has already been answered.", "error");
+    return;
+  }
+
+  const selectedOption = String(new FormData(form).get("selected_option") || "").trim();
+  if (!selectedOption) {
+    showToast("Choose one option before submitting.", "error");
+    return;
+  }
+
+  const result = await apiFetch("/learning/daily-question/answer", {
+    method: "POST",
+    body: {
+      question_date: state.dailyQuestion.question_date,
+      selected_option: selectedOption,
+    },
+  }).catch(handleUiError);
+
+  if (!result) {
+    return;
+  }
+
+  state.dailyQuestion = {
+    ...state.dailyQuestion,
+    attempt: result,
+  };
+  renderDailyQuestion(state.dailyQuestion);
+
+  const toastMessage = result.is_correct
+    ? `Correct answer. ${result.awarded_points} points added.`
+    : `Answer saved. Correct option is ${result.correct_option}.`;
+  showToast(toastMessage, result.is_correct ? "success" : "info");
+  await refreshDashboard();
+}
+
 async function handleAskAi(form) {
   const formData = new FormData(form);
   const question = String(formData.get("question") || "").trim();
@@ -872,10 +1158,7 @@ async function handleAskAi(form) {
   appendChatBubble("user", question);
   form.reset();
 
-  const reply = await apiFetch("/learning/ai-chat", {
-    method: "POST",
-    body: { question },
-  }).catch((error) => {
+  const reply = await requestAiReply(question).catch((error) => {
     appendChatBubble("assistant", `Request failed: ${error.message}`);
     handleUiError(error);
     return null;
@@ -886,6 +1169,52 @@ async function handleAskAi(form) {
   }
 
   appendChatBubble("assistant", reply.answer);
+}
+
+async function requestAiReply(question) {
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      return await apiFetch("/learning/ai-chat", {
+        method: "POST",
+        body: { question },
+      });
+    } catch (error) {
+      lastError = error;
+      if (attempt >= 2 || !shouldRetryAiRequest(error)) {
+        throw error;
+      }
+
+      showToast("AI provider response looked unstable. Retrying once...", "info");
+      await waitForUi(700);
+    }
+  }
+
+  throw lastError || new Error("AI request failed.");
+}
+
+function shouldRetryAiRequest(error) {
+  const status = Number(error?.status || 0);
+  const message = String(error?.message || "").trim().toLowerCase();
+
+  if (status >= 500) {
+    return true;
+  }
+
+  return [
+    "no choices",
+    "empty answer",
+    "no readable answer",
+    "connection failed",
+    "failed to fetch",
+  ].some((token) => message.includes(token));
+}
+
+function waitForUi(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, Math.max(0, Number(ms) || 0));
+  });
 }
 
 async function handleCreateRedeem(form) {
@@ -963,8 +1292,19 @@ async function handleDesktopGuardEvent(event) {
 
 async function syncDesktopGuard() {
   if (!state.desktop.available) {
+    await syncBrowserPageGuard();
     renderDesktopStatus();
     return;
+  }
+
+  if (!hasDesktopConsent()) {
+    disconnectDesktopBridge();
+    renderDesktopStatus();
+    return;
+  }
+
+  if (!state.desktop.unsubscribe || !state.desktop.status) {
+    await initDesktopBridge();
   }
 
   const status = state.desktop.status;
@@ -982,7 +1322,17 @@ async function syncDesktopGuard() {
 
 async function startDesktopGuardForSession(session) {
   if (!state.desktop.available || !session) {
+    await syncBrowserPageGuard();
     return;
+  }
+
+  if (!hasDesktopConsent()) {
+    renderDesktopStatus();
+    return;
+  }
+
+  if (!state.desktop.unsubscribe) {
+    await initDesktopBridge();
   }
 
   const current = state.desktop.status;
@@ -1015,6 +1365,18 @@ async function startDesktopGuardForSession(session) {
 
 async function stopDesktopGuard() {
   if (!state.desktop.available) {
+    clearBrowserViolationTimer();
+    return;
+  }
+
+  if (!hasDesktopConsent()) {
+    disconnectDesktopBridge();
+    renderDesktopStatus();
+    return;
+  }
+
+  if (!state.desktop.status?.active) {
+    renderDesktopStatus();
     return;
   }
 
@@ -1032,6 +1394,7 @@ async function stopDesktopGuard() {
     renderDesktopStatus();
   }
 }
+
 function renderProfile() {
   if (!state.user) {
     return;
@@ -1067,7 +1430,6 @@ function renderSessions() {
       const meta = [
         `Actual ${session.actual_minutes} min`,
         `Points ${session.awarded_points}`,
-        `Lock ${session.lock_mode}`,
       ];
       const blockedApps = (session.blocked_apps_json || []).slice(0, 2).join(", ") || "none";
       const blockedSites = (session.blocked_sites_json || []).slice(0, 2).join(", ") || "none";
@@ -1174,15 +1536,95 @@ function renderLeaderboard() {
 }
 
 function renderDailyQuestion(question) {
-  if (!question) {
+  state.dailyQuestion = question || null;
+
+  if (!state.dailyQuestion) {
+    if (elements.dailyQuestionSubject) {
+      elements.dailyQuestionSubject.textContent = "Subject";
+    }
+    if (elements.dailyQuestionDifficulty) {
+      elements.dailyQuestionDifficulty.textContent = "Difficulty";
+    }
+    elements.dailyQuestionTitle.textContent = "No question loaded.";
+    elements.dailyQuestionBody.textContent = "Start by logging in and loading dashboard data.";
+    if (elements.dailyQuestionHint) {
+      elements.dailyQuestionHint.textContent = "Hint will appear here.";
+    }
+    if (elements.dailyQuestionPoints) {
+      elements.dailyQuestionPoints.textContent = "5 pts";
+    }
+    if (elements.dailyQuestionOptions) {
+      elements.dailyQuestionOptions.innerHTML = `<div class="empty-state">Daily options will appear here.</div>`;
+    }
+    if (elements.dailyQuestionResult) {
+      elements.dailyQuestionResult.textContent = "Answer once per day. A correct answer adds points to your balance and ranking.";
+    }
     return;
   }
 
-  elements.dailyQuestionSubject.textContent = question.subject;
-  elements.dailyQuestionDifficulty.textContent = question.difficulty;
-  elements.dailyQuestionTitle.textContent = question.title;
-  elements.dailyQuestionBody.textContent = question.question;
-  elements.dailyQuestionHint.textContent = question.answer_hint;
+  const attempt = state.dailyQuestion.attempt;
+  if (elements.dailyQuestionSubject) {
+    elements.dailyQuestionSubject.textContent = state.dailyQuestion.subject;
+  }
+  if (elements.dailyQuestionDifficulty) {
+    elements.dailyQuestionDifficulty.textContent = state.dailyQuestion.difficulty;
+  }
+  elements.dailyQuestionTitle.textContent = state.dailyQuestion.title;
+  elements.dailyQuestionBody.textContent = state.dailyQuestion.question;
+  if (elements.dailyQuestionHint) {
+    elements.dailyQuestionHint.textContent = `Hint: ${state.dailyQuestion.answer_hint}`;
+  }
+
+  if (elements.dailyQuestionPoints) {
+    elements.dailyQuestionPoints.textContent = `${state.dailyQuestion.reward_points || 0} pts`;
+  }
+
+  if (elements.dailyQuestionOptions && Array.isArray(state.dailyQuestion.options)) {
+    elements.dailyQuestionOptions.innerHTML = state.dailyQuestion.options
+      .map((option) => {
+        const isSelected = attempt ? attempt.selected_option === option.option_id : false;
+        const isCorrect = attempt ? attempt.correct_option === option.option_id : false;
+        const isWrong = Boolean(attempt && isSelected && !attempt.is_correct);
+        const optionClasses = ["daily-question-option"];
+
+        if (isCorrect) {
+          optionClasses.push("is-correct");
+        }
+        if (isWrong) {
+          optionClasses.push("is-wrong");
+        }
+
+        return `
+          <label class="${optionClasses.join(" ")}">
+            <input
+              type="radio"
+              name="selected_option"
+              value="${escapeHtml(option.option_id)}"
+              ${isSelected ? "checked" : ""}
+              ${attempt ? "disabled" : ""}
+            />
+            <span class="daily-question-option-badge">${escapeHtml(option.option_id)}</span>
+            <span class="daily-question-option-copy">${escapeHtml(option.content)}</span>
+          </label>
+        `;
+      })
+      .join("");
+  }
+
+  if (elements.dailyQuestionForm) {
+    const submitButton = elements.dailyQuestionForm.querySelector('button[type="submit"]');
+    if (submitButton) {
+      submitButton.disabled = Boolean(attempt);
+    }
+  }
+
+  if (elements.dailyQuestionResult) {
+    elements.dailyQuestionResult.textContent = attempt
+      ? attempt.is_correct
+        ? `Correct answer locked in. +${attempt.awarded_points} points counted in your balance and leaderboard.`
+        : `Answer saved for today. Correct option: ${attempt.correct_option}. No points awarded this time.`
+      : "Answer once per day. A correct answer adds points to your balance and ranking.";
+  }
 }
 
 function renderOrders() {
@@ -1288,7 +1730,6 @@ function renderRunningSession() {
   const running = state.activeSession;
   const paused = state.pausedSession;
 
-  elements.completeSessionBtn.disabled = !running;
   elements.interruptSessionBtn.disabled = !running;
   elements.resumeSessionBtn.hidden = !paused;
   elements.resumeSessionBtn.disabled = !paused;
@@ -1300,7 +1741,7 @@ function renderRunningSession() {
 
     elements.runningSessionSummary.innerHTML = buildSessionSummaryMarkup(
       running.status,
-      [`Planned ${running.planned_minutes} min`, `Lock ${running.lock_mode}`],
+      [`Planned ${running.planned_minutes} min`],
       apps,
       sites
     );
@@ -1318,7 +1759,7 @@ function renderRunningSession() {
 
     elements.runningSessionSummary.innerHTML = buildSessionSummaryMarkup(
       paused.status,
-      [`Saved ${formatDuration(elapsedMs)} elapsed`, `${formatDuration(remainingMs)} remaining`, `Lock ${paused.lock_mode}`],
+      [`Saved ${formatDuration(elapsedMs)} elapsed`, `${formatDuration(remainingMs)} remaining`],
       apps,
       sites
     );
@@ -1339,13 +1780,47 @@ function renderRunningSession() {
 function renderDesktopStatus() {
   const available = state.desktop.available;
   const status = state.desktop.status;
+  const consentGranted = hasDesktopConsent();
+  const browserConsentGranted = hasBrowserMonitoringConsent();
+  const consentActions = elements.desktopConsentBtn?.parentElement || null;
+
+  if (consentActions) {
+    consentActions.hidden = true;
+  }
 
   if (!available) {
-    elements.desktopGuardState.textContent = "Browser Only";
-    elements.desktopGuardNote.textContent = "Open this page inside Electron to enable app watch and optional site block.";
-    elements.heroGuardState.textContent = "Browser Only";
+    if (elements.desktopConsentBtn) {
+      elements.desktopConsentBtn.textContent = "Enable Web Check For This Login";
+    }
+
+    if (!browserConsentGranted) {
+      elements.desktopGuardState.textContent = "Web Consent Required";
+      elements.desktopGuardNote.textContent = "Website mode can only detect leaving this study page, switching tabs, or switching windows.";
+      elements.heroGuardState.textContent = "Web Consent Required";
+      elements.guardSupportBadges.innerHTML = [
+        renderSupportBadge("Page Focus", false),
+        renderSupportBadge("Process Watch", false),
+        renderSupportBadge("Site Block", false),
+      ].join("");
+
+      if (consentActions && CURRENT_PAGE === "focus") {
+        consentActions.hidden = false;
+      }
+
+      if (!state.desktop.eventLog.length) {
+        elements.guardEventList.innerHTML = `<div class="empty-state">Web checking is off until you grant consent.</div>`;
+      } else {
+        renderGuardEventLog();
+      }
+      return;
+    }
+
+    const browserLabel = state.activeSession ? "Web Guard Active" : "Web Guard Ready";
+    elements.desktopGuardState.textContent = browserLabel;
+    elements.desktopGuardNote.textContent = "Website mode only checks whether you leave this study page. It cannot inspect apps or exact websites.";
+    elements.heroGuardState.textContent = browserLabel;
     elements.guardSupportBadges.innerHTML = [
-      renderSupportBadge("Window Lock", false),
+      renderSupportBadge("Page Focus", true),
       renderSupportBadge("Process Watch", false),
       renderSupportBadge("Site Block", false),
     ].join("");
@@ -1353,7 +1828,33 @@ function renderDesktopStatus() {
     return;
   }
 
-  const activeLabel = status?.active ? `Active - ${status.lockMode}` : "Desktop Ready";
+  if (elements.desktopConsentBtn) {
+    elements.desktopConsentBtn.textContent = "Enable Monitor For This Login";
+  }
+
+  if (!consentGranted) {
+    elements.desktopGuardState.textContent = "Consent Required";
+    elements.desktopGuardNote.textContent = "Desktop listening needs your permission for this login. If you refuse, the desktop app will close.";
+    elements.heroGuardState.textContent = "Consent Required";
+    elements.guardSupportBadges.innerHTML = [
+      renderSupportBadge("Window Lock", false),
+      renderSupportBadge("Process Watch", false),
+      renderSupportBadge("Site Block", false),
+    ].join("");
+
+    if (consentActions) {
+      consentActions.hidden = false;
+    }
+
+    if (!state.desktop.eventLog.length) {
+      elements.guardEventList.innerHTML = `<div class="empty-state">Monitoring is off until you grant consent.</div>`;
+    } else {
+      renderGuardEventLog();
+    }
+    return;
+  }
+
+  const activeLabel = status?.active ? "Desktop Active" : "Desktop Ready";
   const siteBlockText = status?.siteBlockState === "active"
     ? (status?.siteBlockReason || "Site block active.")
     : status?.siteBlockState === "permission_required"
@@ -1477,6 +1978,7 @@ function stopTimer() {
 
 function tickTimer() {
   if (!state.activeSession) {
+    state.autoCompleteSessionId = 0;
     return;
   }
 
@@ -1485,6 +1987,33 @@ function tickTimer() {
   const endMs = started + plannedMs;
   const remaining = Math.max(0, endMs - Date.now());
   elements.focusLiveTimer.textContent = formatDuration(remaining);
+
+  if (remaining === 0) {
+    scheduleSessionAutoComplete(state.activeSession.session_id);
+  }
+}
+
+function scheduleSessionAutoComplete(sessionId) {
+  if (!sessionId || state.autoCompleteSessionId === sessionId) {
+    return;
+  }
+
+  state.autoCompleteSessionId = sessionId;
+  window.setTimeout(async () => {
+    if (state.activeSession?.session_id !== sessionId) {
+      return;
+    }
+
+    const result = await settleCurrentSession(
+      "complete",
+      {},
+      { successMessage: "Session completed automatically. Points awarded." }
+    );
+
+    if (!result && state.activeSession?.session_id === sessionId) {
+      state.autoCompleteSessionId = 0;
+    }
+  }, 1200);
 }
 
 function appendChatBubble(role, text) {
@@ -1495,9 +2024,11 @@ function appendChatBubble(role, text) {
   elements.chatHistory.scrollTop = elements.chatHistory.scrollHeight;
 }
 
-function logout() {
+async function logout() {
   stopTimer();
-  void stopDesktopGuard();
+  await stopDesktopGuard();
+  disconnectDesktopBridge();
+  clearDesktopConsent();
   state.token = "";
   state.user = null;
   state.activeSession = null;
@@ -1511,10 +2042,14 @@ function logout() {
   state.colleges = [];
   state.orders = [];
   state.feedbacks = [];
+  state.dailyQuestion = null;
+  state.focusPlanItems = [];
+  state.desktop.eventLog = [];
   localStorage.removeItem(STORAGE_KEYS.token);
   localStorage.removeItem(STORAGE_KEYS.user);
   localStorage.removeItem(STORAGE_KEYS.activeSession);
   updateAuthView();
+  renderFocusPlanner();
   renderDesktopStatus();
 
   if (CURRENT_PAGE !== "landing") {
@@ -1551,14 +2086,21 @@ async function apiFetch(path, options = {}) {
     }
 
     const message = data?.detail || `Request failed with status ${response.status}.`;
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
   }
 
   return data;
 }
 
 function handleUiError(error) {
-  showToast(error.message || "Unexpected error.", "error");
+  const rawMessage = String(error?.message || "").trim();
+  const message = rawMessage === "Failed to fetch"
+    ? `Cannot reach API at ${state.apiBase}. For local testing, it should be http://127.0.0.1:8000/api/v1.`
+    : rawMessage || "Unexpected error.";
+
+  showToast(message, "error");
   return null;
 }
 
@@ -1730,6 +2272,588 @@ function getCollegeNameById(collegeId) {
   return leaderboardMatch?.college_name || "";
 }
 
+function readDesktopConsentStatus() {
+  try {
+    return sessionStorage.getItem(STORAGE_KEYS.desktopConsent) === "granted";
+  } catch {
+    return false;
+  }
+}
+
+function hasDesktopConsent() {
+  return Boolean(state.desktop.available && state.desktop.consent);
+}
+
+async function requestDesktopMonitoringConsent({ showSuccessToast = true } = {}) {
+  if (!state.desktop.available) {
+    return false;
+  }
+
+  if (hasDesktopConsent()) {
+    return true;
+  }
+
+  if (state.desktop.promptInFlight) {
+    return false;
+  }
+
+  state.desktop.promptInFlight = true;
+
+  try {
+    const result = typeof window.studyFocusDesktop?.requestMonitoringConsent === "function"
+      ? await window.studyFocusDesktop.requestMonitoringConsent()
+      : { granted: window.confirm("Allow desktop monitoring for this login session?") };
+
+    if (!result?.granted) {
+      disconnectDesktopBridge();
+      renderDesktopStatus();
+
+      if (typeof window.studyFocusDesktop?.quitApp === "function") {
+        await window.studyFocusDesktop.quitApp();
+      }
+
+      return false;
+    }
+
+    sessionStorage.setItem(STORAGE_KEYS.desktopConsent, "granted");
+    state.desktop.consent = true;
+    await initDesktopBridge();
+    await syncDesktopGuard();
+
+    if (showSuccessToast) {
+      showToast("Desktop monitoring enabled for this login.", "success");
+    }
+
+    return true;
+  } catch (error) {
+    showToast(`Desktop permission prompt failed: ${error.message}`, "error");
+    renderDesktopStatus();
+    return false;
+  } finally {
+    state.desktop.promptInFlight = false;
+  }
+}
+
+async function requestBrowserMonitoringConsent({ showSuccessToast = true } = {}) {
+  if (state.desktop.available) {
+    return false;
+  }
+
+  if (hasBrowserMonitoringConsent()) {
+    return true;
+  }
+
+  if (state.web.promptInFlight) {
+    return false;
+  }
+
+  state.web.promptInFlight = true;
+
+  try {
+    const granted = window.confirm(
+      "Allow website-mode focus checking for this login session? In web mode, we can only detect when you leave this study page, switch tabs, or switch windows."
+    );
+
+    if (!granted) {
+      renderDesktopStatus();
+      return false;
+    }
+
+    sessionStorage.setItem(STORAGE_KEYS.browserConsent, "granted");
+    state.web.consent = true;
+    await syncBrowserPageGuard();
+    renderDesktopStatus();
+
+    if (showSuccessToast) {
+      showToast("Website-mode focus checking enabled for this login.", "success");
+    }
+
+    return true;
+  } catch (error) {
+    showToast(`Web focus permission prompt failed: ${error.message}`, "error");
+    renderDesktopStatus();
+    return false;
+  } finally {
+    state.web.promptInFlight = false;
+  }
+}
+
+async function syncBrowserPageGuard() {
+  if (state.desktop.available) {
+    clearBrowserAwayState();
+    clearBrowserViolationTimer();
+    return;
+  }
+
+  if (!hasBrowserMonitoringConsent()) {
+    clearBrowserAwayState();
+    clearBrowserViolationTimer();
+    renderDesktopStatus();
+    return;
+  }
+
+  if (!state.activeSession) {
+    clearBrowserAwayState();
+    clearBrowserViolationTimer();
+    renderDesktopStatus();
+    return;
+  }
+
+  if (CURRENT_PAGE !== "focus") {
+    await handleBrowserModeViolation("route_change");
+    return;
+  }
+
+  renderDesktopStatus();
+}
+
+function handleBrowserVisibilityChange() {
+  if (document.hidden) {
+    scheduleBrowserModeViolation("tab_hidden");
+    return;
+  }
+
+  void handleBrowserModeReturn();
+}
+
+function handleBrowserWindowBlur() {
+  scheduleBrowserModeViolation("window_blur");
+}
+
+function handleBrowserWindowFocus() {
+  void handleBrowserModeReturn();
+}
+
+function handleBrowserPageHide() {
+  scheduleBrowserModeViolation("route_change");
+}
+
+function scheduleBrowserModeViolation(trigger) {
+  if (state.desktop.available || !hasBrowserMonitoringConsent() || !state.activeSession || CURRENT_PAGE !== "focus") {
+    return;
+  }
+
+  if (state.web.promptInFlight || state.guardInterruptInFlight) {
+    return;
+  }
+
+  const existingAwayState = state.web.awayStartedAt
+    ? { startedAt: state.web.awayStartedAt, trigger: state.web.awayTrigger }
+    : readBrowserAwayState();
+
+  if (existingAwayState.startedAt) {
+    return;
+  }
+
+  const startedAt = Date.now();
+  state.web.awayStartedAt = startedAt;
+  state.web.awayTrigger = trigger;
+  persistBrowserAwayState(startedAt, trigger);
+}
+
+function clearBrowserViolationTimer() {
+  if (state.web.violationTimerId) {
+    window.clearTimeout(state.web.violationTimerId);
+    state.web.violationTimerId = null;
+  }
+}
+
+async function handleBrowserModeReturn() {
+  clearBrowserViolationTimer();
+
+  const awayState = state.web.awayStartedAt
+    ? { startedAt: state.web.awayStartedAt, trigger: state.web.awayTrigger }
+    : readBrowserAwayState();
+
+  if (!awayState.startedAt) {
+    flushBrowserViolationNotice();
+    return;
+  }
+
+  if (CURRENT_PAGE !== "focus") {
+    return;
+  }
+
+  if (state.desktop.available || !hasBrowserMonitoringConsent()) {
+    clearBrowserAwayState();
+    flushBrowserViolationNotice();
+    return;
+  }
+
+  if (!state.activeSession) {
+    clearBrowserAwayState();
+    flushBrowserViolationNotice();
+    return;
+  }
+
+  clearBrowserAwayState();
+
+  if (Date.now() - awayState.startedAt < 15000) {
+    flushBrowserViolationNotice();
+    return;
+  }
+
+  await handleBrowserModeViolation(awayState.trigger || "window_blur", { presentOnCurrentPage: true });
+}
+
+async function handleBrowserModeViolation(trigger, { presentOnCurrentPage = false } = {}) {
+  if (state.desktop.available || !hasBrowserMonitoringConsent() || !state.activeSession || state.guardInterruptInFlight) {
+    return;
+  }
+
+  clearBrowserViolationTimer();
+  clearBrowserAwayState();
+
+  const messages = {
+    tab_hidden: "You left the Learning page for more than 15 seconds. The website-mode focus session will be abandoned.",
+    window_blur: "The Learning page lost focus for more than 15 seconds. The website-mode focus session will be abandoned.",
+    route_change: "You left the Learning page during an active website-mode focus session. The session will be abandoned.",
+  };
+
+  const event = {
+    type: "browser_focus_lost",
+    detectedAt: new Date().toISOString(),
+    message: messages[trigger] || "Website-mode guard detected that the study page lost focus.",
+  };
+  const noticeMessage = `${event.message}\n\nSession abandoned and no points were awarded.`;
+
+  pushGuardEvent(event);
+  showToast(event.message, "error");
+  if (presentOnCurrentPage && CURRENT_PAGE === "focus" && !document.hidden) {
+    showBrowserViolationModal(noticeMessage);
+  } else {
+    persistBrowserViolationNotice(event.message);
+  }
+
+  state.guardInterruptInFlight = true;
+  try {
+    await settleCurrentSession(
+      "abandon",
+      { remark: `Web guard violation: ${trigger}` },
+      { successMessage: "Session ended by website-mode guard. Progress cleared and no points awarded." }
+    );
+  } finally {
+    state.guardInterruptInFlight = false;
+  }
+}
+
+function persistBrowserViolationNotice(message) {
+  try {
+    sessionStorage.setItem(STORAGE_KEYS.browserViolationNotice, String(message || "").trim());
+  } catch {
+    // Ignore storage errors for private sessions.
+  }
+}
+
+function flushBrowserViolationNotice() {
+  if (CURRENT_PAGE !== "focus") {
+    return;
+  }
+
+  let notice = "";
+
+  try {
+    notice = String(sessionStorage.getItem(STORAGE_KEYS.browserViolationNotice) || "").trim();
+  } catch {
+    notice = "";
+  }
+
+  if (!notice) {
+    return;
+  }
+
+  try {
+    sessionStorage.removeItem(STORAGE_KEYS.browserViolationNotice);
+  } catch {
+    // Ignore storage errors for private sessions.
+  }
+
+  showBrowserViolationModal(`${notice}\n\nSession abandoned and no points were awarded.`);
+}
+
+function persistBrowserAwayState(startedAt, trigger) {
+  const safeStartedAt = Number(startedAt) || 0;
+  const safeTrigger = String(trigger || "window_blur").trim() || "window_blur";
+
+  try {
+    sessionStorage.setItem(
+      STORAGE_KEYS.browserAwayState,
+      JSON.stringify({
+        startedAt: safeStartedAt,
+        trigger: safeTrigger,
+      })
+    );
+  } catch {
+    // Ignore storage errors for private sessions.
+  }
+}
+
+function readBrowserAwayState() {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEYS.browserAwayState);
+    if (!raw) {
+      return { startedAt: 0, trigger: "" };
+    }
+
+    const parsed = JSON.parse(raw);
+    return {
+      startedAt: Number(parsed?.startedAt) || 0,
+      trigger: String(parsed?.trigger || "").trim(),
+    };
+  } catch {
+    return { startedAt: 0, trigger: "" };
+  }
+}
+
+function clearBrowserAwayState() {
+  state.web.awayStartedAt = 0;
+  state.web.awayTrigger = "";
+
+  try {
+    sessionStorage.removeItem(STORAGE_KEYS.browserAwayState);
+  } catch {
+    // Ignore storage errors for private sessions.
+  }
+}
+
+function ensureBrowserViolationModal() {
+  let overlay = document.querySelector("#browser-violation-modal");
+  if (overlay) {
+    return overlay;
+  }
+
+  overlay = document.createElement("div");
+  overlay.id = "browser-violation-modal";
+  overlay.className = "browser-violation-modal";
+  overlay.hidden = true;
+  overlay.innerHTML = `
+    <div class="browser-violation-modal__card surface" role="alertdialog" aria-modal="true" aria-labelledby="browser-violation-title">
+      <div class="browser-violation-modal__head">
+        <h3 id="browser-violation-title">Focus Session Abandoned</h3>
+        <button type="button" class="browser-violation-modal__close" aria-label="Close">Close</button>
+      </div>
+      <p class="browser-violation-modal__body"></p>
+      <button type="button" class="primary-button browser-violation-modal__action">OK</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const close = () => hideBrowserViolationModal();
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) {
+      close();
+      return;
+    }
+
+    if (event.target.closest(".browser-violation-modal__close") || event.target.closest(".browser-violation-modal__action")) {
+      close();
+    }
+  });
+
+  return overlay;
+}
+
+function showBrowserViolationModal(message) {
+  const overlay = ensureBrowserViolationModal();
+  const body = overlay.querySelector(".browser-violation-modal__body");
+  if (body) {
+    body.textContent = String(message || "").trim();
+  }
+
+  overlay.hidden = false;
+  document.body.classList.add("browser-violation-open");
+}
+
+function hideBrowserViolationModal() {
+  const overlay = document.querySelector("#browser-violation-modal");
+  if (!overlay) {
+    return;
+  }
+
+  overlay.hidden = true;
+  document.body.classList.remove("browser-violation-open");
+}
+
+function clearDesktopConsent() {
+  try {
+    sessionStorage.removeItem(STORAGE_KEYS.desktopConsent);
+    sessionStorage.removeItem(STORAGE_KEYS.browserConsent);
+    sessionStorage.removeItem(STORAGE_KEYS.browserViolationNotice);
+  } catch {
+    // Ignore storage errors for private sessions.
+  }
+
+  state.desktop.consent = false;
+  state.desktop.promptInFlight = false;
+  state.web.consent = false;
+  state.web.promptInFlight = false;
+  clearBrowserAwayState();
+  clearBrowserViolationTimer();
+}
+
+function readBrowserConsentStatus() {
+  try {
+    return sessionStorage.getItem(STORAGE_KEYS.browserConsent) === "granted";
+  } catch {
+    return false;
+  }
+}
+
+function hasBrowserMonitoringConsent() {
+  return Boolean(!state.desktop.available && state.web.consent);
+}
+
+function getFocusPlanStorageKey() {
+  const username = String(state.user?.username || "").trim();
+  return username ? `${FOCUS_PLAN_STORAGE_PREFIX}${username}` : "";
+}
+
+function loadFocusPlanner() {
+  const storageKey = getFocusPlanStorageKey();
+  if (!storageKey) {
+    state.focusPlanItems = [];
+    renderFocusPlanner();
+    return;
+  }
+
+  try {
+    const raw = localStorage.getItem(storageKey);
+    const parsed = raw ? JSON.parse(raw) : [];
+    state.focusPlanItems = Array.isArray(parsed)
+      ? parsed
+        .filter((item) => item && typeof item.id === "string" && typeof item.text === "string")
+        .map((item) => ({
+          id: item.id,
+          text: item.text,
+          done: Boolean(item.done),
+        }))
+      : [];
+  } catch {
+    state.focusPlanItems = [];
+  }
+
+  renderFocusPlanner();
+}
+
+function persistFocusPlanner() {
+  const storageKey = getFocusPlanStorageKey();
+  if (!storageKey) {
+    return;
+  }
+
+  localStorage.setItem(storageKey, JSON.stringify(state.focusPlanItems));
+}
+
+function handleAddFocusPlan(form) {
+  if (!state.token || !state.user) {
+    showToast("Login first to keep a local plan.", "error");
+    return;
+  }
+
+  const task = String(new FormData(form).get("task") || "").trim();
+  if (!task) {
+    showToast("Enter one short task first.", "error");
+    return;
+  }
+
+  state.focusPlanItems = [
+    ...state.focusPlanItems,
+    {
+      id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      text: task.slice(0, 120),
+      done: false,
+    },
+  ].slice(-8);
+
+  persistFocusPlanner();
+  renderFocusPlanner();
+  form.reset();
+  showToast("Plan item added.", "success");
+}
+
+function toggleFocusPlanItem(itemId) {
+  if (!itemId) {
+    return;
+  }
+
+  state.focusPlanItems = state.focusPlanItems.map((item) => {
+    if (item.id !== itemId) {
+      return item;
+    }
+
+    return {
+      ...item,
+      done: !item.done,
+    };
+  });
+
+  persistFocusPlanner();
+  renderFocusPlanner();
+}
+
+function deleteFocusPlanItem(itemId) {
+  if (!itemId) {
+    return;
+  }
+
+  const nextItems = state.focusPlanItems.filter((item) => item.id !== itemId);
+  if (nextItems.length === state.focusPlanItems.length) {
+    return;
+  }
+
+  state.focusPlanItems = nextItems;
+  persistFocusPlanner();
+  renderFocusPlanner();
+}
+
+function renderFocusPlanner() {
+  const taskInput = elements.focusPlanForm?.elements.namedItem("task");
+  const addButton = elements.focusPlanForm?.querySelector('button[type="submit"]');
+  const isReady = Boolean(state.token && state.user);
+
+  if (taskInput) {
+    taskInput.disabled = !isReady;
+    taskInput.placeholder = isReady
+      ? "Add one task you want to finish in this session."
+      : "Login to keep a local study plan.";
+  }
+
+  if (addButton) {
+    addButton.disabled = !isReady;
+  }
+
+  if (!elements.focusPlanList) {
+    return;
+  }
+
+  if (!isReady) {
+    elements.focusPlanList.className = "focus-plan-list empty-state";
+    elements.focusPlanList.textContent = "Login to keep a local study plan.";
+    return;
+  }
+
+  if (!state.focusPlanItems.length) {
+    elements.focusPlanList.className = "focus-plan-list empty-state";
+    elements.focusPlanList.textContent = "No plan items yet.";
+    return;
+  }
+
+  elements.focusPlanList.className = "focus-plan-list";
+  elements.focusPlanList.innerHTML = state.focusPlanItems
+    .map((item) => {
+      return `
+        <div class="focus-plan-row">
+          <button type="button" class="focus-plan-item ${item.done ? "is-done" : ""}" data-plan-item-id="${escapeHtml(item.id)}">
+            <span class="focus-plan-mark">${item.done ? "✓" : ""}</span>
+            <span class="focus-plan-copy">${escapeHtml(item.text)}</span>
+          </button>
+          <button type="button" class="focus-plan-delete" data-plan-delete-id="${escapeHtml(item.id)}" aria-label="Delete task">Delete</button>
+        </div>
+      `;
+    })
+    .join("");
+}
+
 function setFormValue(form, name, value) {
   const input = form.elements.namedItem(name);
   if (input) {
@@ -1808,6 +2932,11 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 }
+
+
+
+
+
 
 
 

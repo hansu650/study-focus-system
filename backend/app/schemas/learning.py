@@ -1,8 +1,28 @@
 ﻿"""Learning feature schemas."""
 
-from datetime import date
+from datetime import date, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class DailyQuestionOptionOut(BaseModel):
+    """One selectable option for the daily quiz."""
+
+    option_id: str
+    content: str
+
+
+class DailyQuestionAttemptOut(BaseModel):
+    """Persisted answer state for today's quiz."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    question_date: date
+    selected_option: str
+    correct_option: str
+    is_correct: int
+    awarded_points: int
+    answered_at: datetime
 
 
 class DailyQuestionOut(BaseModel):
@@ -14,6 +34,27 @@ class DailyQuestionOut(BaseModel):
     title: str
     question: str
     answer_hint: str
+    reward_points: int
+    options: list[DailyQuestionOptionOut]
+    attempt: DailyQuestionAttemptOut | None = None
+
+
+class DailyQuestionAnswerRequest(BaseModel):
+    """Answer submission for today's quiz."""
+
+    question_date: date
+    selected_option: str = Field(min_length=1, max_length=1)
+
+
+class DailyQuestionAnswerResponse(BaseModel):
+    """Submission result for today's quiz."""
+
+    question_date: date
+    selected_option: str
+    correct_option: str
+    is_correct: int
+    awarded_points: int
+    answered_at: datetime
 
 
 class AIChatRequest(BaseModel):

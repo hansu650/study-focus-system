@@ -341,3 +341,52 @@ Record completed backend, frontend, and desktop-guard milestones, plus debugging
 1. Adjusted the Electron focus-window policy so the app no longer pins itself above every other window during testing.
 2. FULL_LOCK still uses full-screen presentation, but users can now Alt+Tab away to deliberately open blocked apps or blocked websites for validation.
 3. This keeps the demo visually strong while making manual guard testing practical.
+
+## Sprint 4 UI + Dual-Mode Update - 2026-03-18
+1. Added dual monitoring behavior:
+   - website mode now checks whether the user leaves the Guide Page after consent
+   - desktop mode still uses Electron for stronger app/site monitoring after consent
+2. Added a 15-second grace window before website-mode leave-page violations are settled.
+3. Added delete support to the local plan notebook so tasks can now be removed as well as checked off.
+4. Simplified the visible daily-question UI on the Learning page by removing extra top badges, refresh action, inline answer-result text, and hint copy.
+5. Shortened the feedback headline to `Collect improvement notes.` for a cleaner demo surface.
+6. Hardened AI response parsing so OpenAI-compatible providers that return non-`choices` payload shapes can still produce an answer instead of failing immediately.
+7. Updated frontend versioned asset references again to force browsers onto the latest static bundle.
+
+## Current Follow-Up Notes - 2026-03-18
+1. Website mode is intentionally honest about its limits: it detects leaving the study page, not exact external websites.
+2. Desktop mode is still the only path that can inspect blocked apps and browser-window titles locally.
+3. AI should now be retested against the user's active provider credentials after restarting the backend process.
+
+## Sprint 4 Browser Popup Follow-Up - 2026-03-19
+1. Added a stronger browser-mode violation notice flow so leaving the Guide Page now persists a pending warning and shows a blocking alert when the user returns.
+2. Kept the website-mode grace window at 15 seconds, but made the abandon result much more explicit than a background toast.
+3. Removed the `NONE` option from the Guide Page lock-mode selector so the public demo no longer suggests an unguarded mode.
+
+## Sprint 4 Guide Page Cleanup - 2026-03-19
+1. Removed the visible `Lock Mode` selector from the Guide Page form and now submit `APP_BLOCK` as the default mode behind the scenes so the UI stays simpler for the web demo.
+2. Removed visible `Lock ...` badges from the running-session and session-history summaries so the public focus flow no longer exposes extra mode jargon.
+3. Reworked website-mode away tracking to persist the leave timestamp and trigger reason, then settle the violation when the user returns to the Guide Page instead of relying on background-tab timers.
+4. Bumped the frontend asset version to `sprint4r15` so the updated Guide Page / Learning rename and website-mode popup behavior can break through cached static files.
+
+## Sprint 4 Learning Rename + Return Fix - 2026-03-19
+1. Renamed the main focus surface from `Guide Page` to `Learning` and renamed the former daily-question route to `Break Space` so the navigation no longer shows two competing learning labels.
+2. Added `pagehide` tracking plus a post-refresh return check so same-tab jumps to external sites like bilibili can still be settled when the user comes back to the Learning page.
+3. Changed browser-mode violation notices so they only render on the Learning page itself instead of popping on unrelated routes such as Feedback or Rankings.
+
+## Sprint 4 AI Stability Follow-Up - 2026-03-19
+1. Expanded the OpenAI-compatible backend adapter so it now parses more payload shapes, including legacy `choices[].text`, nested response wrappers, and provider error payloads.
+2. Added a backend fallback from `chat/completions` to `responses` when the primary endpoint returns an empty-but-successful body, which should reduce the `No choices in OpenAI response` failures seen in the web demo.
+3. Added a lightweight frontend retry for AI chat so one transient 5xx or empty-response style failure does not immediately surface as a red error bubble to the user.
+4. Bumped the frontend asset version to `sprint4r16` so the AI retry behavior can break through cached static files.
+
+## Sprint 4 Auto-Complete Cleanup - 2026-03-19
+1. Removed the visible `Complete Session` button from the Learning page because it was just a manual settlement control that added clutter to the demo.
+2. Added automatic session completion when the countdown reaches zero, so points are still awarded without requiring an extra click.
+3. Bumped the frontend asset version to `sprint4r17` so the button removal and auto-complete behavior can break through cached static files.
+
+## Sprint 4 Showcase Seed Expansion - 2026-03-19
+1. Expanded `db/add_demo_leaderboard_samples.sql` so demo data now covers richer rankings plus at least one row in each major business table: users, focus sessions, point ledger, daily question attempts, redeem orders, and feedback messages.
+2. Added extra demo accounts across both schools and colleges so the day leaderboard looks fuller and no longer appears nearly empty during teacher demos.
+3. Updated `seed_demo.ps1` to load the daily-question migration and the richer showcase seed set by default, so a fresh deployment can reach the same visible state as local testing with one command.
+4. Updated `seed_leaderboard_demo.ps1` and `DEPLOYMENT.md` so existing environments can refresh only the showcase dataset without re-running the full schema bootstrap.

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Study Focus Atlas</title>
-    <link rel="stylesheet" href="./src/styles.css" />
+    <link rel="stylesheet" href="./src/styles.css?v=sprint4r16" />
   </head>
   <body data-page="rankings">
     <div class="page-shell">
@@ -31,13 +31,12 @@
 
         <nav class="surface rail-map">
           <p class="eyebrow">Pages</p>
-          <a class="rail-link rail-link-landing" href="./index.html">Login</a>
-          <a class="rail-link rail-link-home" href="./home.html">Studio Home</a>
-          <a class="rail-link rail-link-focus" href="./focus.html">Focus Lab</a>
-          <a class="rail-link rail-link-rankings" href="./rankings.html">Rankings</a>
-          <a class="rail-link rail-link-learning" href="./learning.html">Learning</a>
-          <a class="rail-link rail-link-rewards" href="./rewards.html">Rewards</a>
-          <a class="rail-link rail-link-feedback" href="./feedback.html">Feedback</a>
+          <a class="rail-link rail-link-landing" href="./index.html?v=sprint4r16">Login</a>
+                    <a class="rail-link rail-link-focus" href="./focus.html?v=sprint4r16">Learning</a>
+          <a class="rail-link rail-link-rankings" href="./rankings.html?v=sprint4r16">Rankings</a>
+          <a class="rail-link rail-link-learning" href="./learning.html?v=sprint4r16">Break Space</a>
+          <a class="rail-link rail-link-rewards" href="./rewards.html?v=sprint4r16">Rewards</a>
+          <a class="rail-link rail-link-feedback" href="./feedback.html?v=sprint4r16">Feedback</a>
         </nav>
 
         <section class="surface rail-reference">
@@ -241,27 +240,27 @@
           </section>
 
           <section class="dashboard-hub">
-            <a class="surface hub-card hub-card-focus" href="./focus.html">
+            <a class="surface hub-card hub-card-focus" href="./focus.html?v=sprint4r16">
               <p class="eyebrow">Page</p>
-              <h3>Focus Lab</h3>
+              <h3>Learning</h3>
               <p class="hint-copy">Run sessions, monitor the live timer, and inspect guard events without distraction from other modules.</p>
             </a>
-            <a class="surface hub-card hub-card-rankings" href="./rankings.html">
+            <a class="surface hub-card hub-card-rankings" href="./rankings.html?v=sprint4r16">
               <p class="eyebrow">Page</p>
               <h3>Rankings</h3>
               <p class="hint-copy">Switch by day, month, year, school, or college and keep the ranking presentation isolated from the timer.</p>
             </a>
-            <a class="surface hub-card hub-card-learning" href="./learning.html">
+            <a class="surface hub-card hub-card-learning" href="./learning.html?v=sprint4r16">
               <p class="eyebrow">Page</p>
-              <h3>Learning</h3>
+              <h3>Break Space</h3>
               <p class="hint-copy">Read the daily question and ask AI in a dedicated break-space instead of mixing it into the control panel.</p>
             </a>
-            <a class="surface hub-card hub-card-rewards" href="./rewards.html">
+            <a class="surface hub-card hub-card-rewards" href="./rewards.html?v=sprint4r16">
               <p class="eyebrow">Page</p>
               <h3>Rewards</h3>
               <p class="hint-copy">Generate redeem codes and review coupon output in a calmer, task-specific surface.</p>
             </a>
-            <a class="surface hub-card hub-card-feedback" href="./feedback.html">
+            <a class="surface hub-card hub-card-feedback" href="./feedback.html?v=sprint4r16">
               <p class="eyebrow">Page</p>
               <h3>Feedback</h3>
               <p class="hint-copy">Collect product notes and UI issues on a page that does not compete with rankings or focus controls.</p>
@@ -272,7 +271,7 @@
             <div class="workbench-main">
               <article class="surface focus-lab-card">
                 <div class="panel-head">
-                  <p class="eyebrow">Focus Lab</p>
+                  <p class="eyebrow">Learning</p>
                   <h3>Run the timer, trigger guard rules, and keep the session lifecycle readable.</h3>
                 </div>
 
@@ -289,17 +288,6 @@
                       <span>Planned Minutes</span>
                       <input name="planned_minutes" type="number" value="25" min="1" max="240" required />
                     </label>
-
-                    <label>
-                      <span>Lock Mode</span>
-                      <select name="lock_mode">
-                        <option value="APP_BLOCK">APP_BLOCK</option>
-                        <option value="WEB_BLOCK">WEB_BLOCK</option>
-                        <option value="FULL_LOCK">FULL_LOCK</option>
-                        <option value="NONE">NONE</option>
-                      </select>
-                    </label>
-
                     <label>
                       <span>Blocked Apps</span>
                       <input name="blocked_apps" type="text" placeholder="steam.exe, qqmusic.exe, wechat.exe" />
@@ -315,7 +303,6 @@
                 </div>
 
                 <div class="session-actions">
-                  <button id="complete-session-btn" class="primary-button secondary-tone" type="button">Complete Session</button>
                   <button id="interrupt-session-btn" class="ghost-button warning-tone" type="button">Interrupt</button>
                   <button id="resume-session-btn" class="ghost-button secondary-tone" type="button" hidden>Resume</button>
                   <button id="abandon-session-btn" class="ghost-button danger-tone" type="button">Abandon</button>
@@ -478,7 +465,7 @@
               <article class="surface feedback-card">
                 <div class="panel-head">
                   <p class="eyebrow">Feedback</p>
-                  <h3>Collect improvement notes without mixing them into the study controls.</h3>
+                  <h3>Collect improvement notes.</h3>
                 </div>
 
                 <form id="feedback-form" class="stack-form feedback-form">
@@ -528,9 +515,26 @@
 
     <div id="toast" class="toast" hidden></div>
 
-    <script type="module" src="./src/app.js"></script>
+    <script type="module" src="./src/app.js?v=sprint4r16"></script>
   </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -1,4 +1,4 @@
--- ============================================================================
+﻿-- ============================================================================
 -- Project: Study Focus (Desktop Pomodoro + Incentive System)
 -- Database: MySQL 8.0+
 -- Purpose : Core schema DDL
@@ -14,6 +14,7 @@ SET NAMES utf8mb4;
 -- Drop tables in reverse dependency order for re-runs
 DROP TABLE IF EXISTS feedback_message;
 DROP TABLE IF EXISTS redeem_order;
+DROP TABLE IF EXISTS daily_question_attempt;
 DROP TABLE IF EXISTS point_ledger;
 DROP TABLE IF EXISTS focus_session;
 DROP TABLE IF EXISTS app_user;
@@ -191,7 +192,34 @@ CREATE TABLE point_ledger (
   CONSTRAINT ck_ledger_balance CHECK (balance_after = balance_before + change_points)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Point ledger';
 
--- 8) Redeem order table
+-- 8) Daily question attempt table
+CREATE TABLE daily_question_attempt (
+  attempt_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Attempt ID',
+  user_id BIGINT UNSIGNED NOT NULL COMMENT 'User ID',
+  question_date DATE NOT NULL COMMENT 'Daily quiz date',
+  subject VARCHAR(64) NOT NULL COMMENT 'Question subject',
+  difficulty VARCHAR(32) NOT NULL COMMENT 'Question difficulty',
+  title VARCHAR(120) NOT NULL COMMENT 'Question title',
+  selected_option CHAR(1) NOT NULL COMMENT 'Submitted option',
+  correct_option CHAR(1) NOT NULL COMMENT 'Correct option',
+  is_correct TINYINT(1) NOT NULL DEFAULT 0 COMMENT '0=wrong,1=correct',
+  awarded_points INT NOT NULL DEFAULT 0 COMMENT 'Awarded points',
+  points_txn_id BIGINT UNSIGNED NULL COMMENT 'Related reward transaction',
+  answered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Answer time',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Created time',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Updated time',
+  PRIMARY KEY (attempt_id),
+  UNIQUE KEY uk_question_attempt_user_date (user_id, question_date),
+  KEY idx_question_attempt_answered (answered_at),
+  CONSTRAINT fk_question_attempt_user
+    FOREIGN KEY (user_id) REFERENCES app_user(user_id)
+    ON UPDATE CASCADE ON DELETE RESTRICT,
+  CONSTRAINT fk_question_attempt_points
+    FOREIGN KEY (points_txn_id) REFERENCES point_ledger(txn_id)
+    ON UPDATE CASCADE ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Daily quiz answer records';
+
+-- 9) Redeem order table
 CREATE TABLE redeem_order (
   redeem_order_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Redeem order ID',
   order_no VARCHAR(32) NOT NULL COMMENT 'Business order number',
@@ -227,3 +255,4 @@ CREATE TABLE redeem_order (
   CONSTRAINT ck_order_points_cost CHECK (points_cost > 0),
   CONSTRAINT ck_order_print_pages CHECK (print_quota_pages > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Redeem and verification orders';
+
