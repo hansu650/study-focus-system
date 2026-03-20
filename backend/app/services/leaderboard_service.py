@@ -1,12 +1,13 @@
-"""Leaderboard query service."""
+﻿"""Leaderboard query service."""
 
 from datetime import date, datetime, time, timedelta
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.models.dicts import DictCollege, DictSchool
 from app.db.models.focus import FocusSession
+from app.db.models.points import PointLedger
 from app.db.models.user import AppUser
 from app.schemas.leaderboard import (
     FocusLeaderboardOut,
@@ -39,8 +40,41 @@ class LeaderboardService:
         selected_school_id = school_id or current_user.school_id
         selected_college_id = college_id or current_user.college_id
 
-        points_sum = func.coalesce(func.sum(FocusSession.awarded_points), 0).label("total_points")
-        minutes_sum = func.coalesce(func.sum(FocusSession.actual_minutes), 0).label("total_focus_minutes")
+        points_subquery = (
+            select(
+                PointLedger.user_id.label("user_id"),
+                func.coalesce(func.sum(PointLedger.change_points), 0).label("earned_points"),
+            )
+            .where(
+                and_(
+                    PointLedger.biz_type.in_(("FOCUS_REWARD", "QUESTION_REWARD")),
+                    PointLedger.occurred_at >= dt_start,
+                    PointLedger.occurred_at < dt_end_exclusive,
+                )
+            )
+            .group_by(PointLedger.user_id)
+            .subquery()
+        )
+
+        minutes_subquery = (
+            select(
+                FocusSession.user_id.label("user_id"),
+                func.coalesce(func.sum(FocusSession.actual_minutes), 0).label("focus_minutes"),
+            )
+            .where(
+                and_(
+                    FocusSession.status == "COMPLETED",
+                    FocusSession.settle_status == 1,
+                    FocusSession.end_at >= dt_start,
+                    FocusSession.end_at < dt_end_exclusive,
+                )
+            )
+            .group_by(FocusSession.user_id)
+            .subquery()
+        )
+
+        points_sum = func.coalesce(points_subquery.c.earned_points, 0).label("total_points")
+        minutes_sum = func.coalesce(minutes_subquery.c.focus_minutes, 0).label("total_focus_minutes")
 
         stmt = (
             select(
@@ -54,17 +88,11 @@ class LeaderboardService:
                 points_sum,
                 minutes_sum,
             )
-            .join(FocusSession, FocusSession.user_id == AppUser.user_id)
             .join(DictSchool, DictSchool.school_id == AppUser.school_id)
             .join(DictCollege, DictCollege.college_id == AppUser.college_id)
-            .where(
-                and_(
-                    FocusSession.status == "COMPLETED",
-                    FocusSession.settle_status == 1,
-                    FocusSession.end_at >= dt_start,
-                    FocusSession.end_at < dt_end_exclusive,
-                )
-            )
+            .outerjoin(points_subquery, points_subquery.c.user_id == AppUser.user_id)
+            .outerjoin(minutes_subquery, minutes_subquery.c.user_id == AppUser.user_id)
+            .where(or_(points_sum > 0, minutes_sum > 0))
         )
 
         selected_school_name = None
@@ -87,17 +115,7 @@ class LeaderboardService:
             selected_college_id = None
 
         rows = db.execute(
-            stmt.group_by(
-                AppUser.user_id,
-                AppUser.username,
-                AppUser.nickname,
-                AppUser.school_id,
-                DictSchool.school_name,
-                AppUser.college_id,
-                DictCollege.college_name,
-            )
-            .order_by(points_sum.desc(), minutes_sum.desc(), AppUser.user_id.asc())
-            .limit(limit)
+            stmt.order_by(points_sum.desc(), minutes_sum.desc(), AppUser.user_id.asc()).limit(limit)
         ).all()
 
         items = [

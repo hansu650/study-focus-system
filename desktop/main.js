@@ -74,12 +74,38 @@ function registerIpc() {
     return guard.getStatus();
   });
 
+  ipcMain.handle("desktop:request-monitoring-consent", async () => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return { granted: false };
+    }
+
+    const result = await dialog.showMessageBox(mainWindow, {
+      type: "question",
+      buttons: ["Allow Monitoring", "Exit App"],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+      title: "Desktop Monitoring Permission",
+      message: "Allow desktop monitoring for this login session?",
+      detail:
+        "The app will only listen for blocked apps and blocked sites after you agree. If you do not allow monitoring, the desktop app will close.",
+    });
+
+    return { granted: result.response === 0 };
+  });
+
   ipcMain.handle("desktop:start-guard", async (_, payload) => {
     return guard.start(payload, mainWindow);
   });
 
   ipcMain.handle("desktop:stop-guard", async () => {
     return guard.stop(mainWindow);
+  });
+
+  ipcMain.handle("desktop:quit-app", async () => {
+    await guard.stop(mainWindow);
+    app.quit();
+    return true;
   });
 }
 

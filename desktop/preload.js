@@ -5,11 +5,17 @@ contextBridge.exposeInMainWorld("studyFocusDesktop", {
   getStatus() {
     return ipcRenderer.invoke("desktop:get-status");
   },
+  requestMonitoringConsent() {
+    return ipcRenderer.invoke("desktop:request-monitoring-consent");
+  },
   startGuard(payload) {
     return ipcRenderer.invoke("desktop:start-guard", payload);
   },
   stopGuard() {
     return ipcRenderer.invoke("desktop:stop-guard");
+  },
+  quitApp() {
+    return ipcRenderer.invoke("desktop:quit-app");
   },
   onGuardEvent(callback) {
     const listener = (_, event) => callback(event);

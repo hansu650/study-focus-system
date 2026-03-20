@@ -13,7 +13,11 @@ class PointLedger(Base):
 
     __tablename__ = "point_ledger"
 
-    txn_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    txn_id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
     user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     change_points: Mapped[int] = mapped_column(Integer, nullable=False)
     balance_before: Mapped[int] = mapped_column(Integer, nullable=False)
