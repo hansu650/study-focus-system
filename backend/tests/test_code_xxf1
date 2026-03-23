@@ -52,7 +52,6 @@ def test_db_connection(db_connection):
 def test_add_daily_question_attempt(db_connection):
     """Test inserting daily question attempt records into database"""
     from db.operations import add_question_attempt
-
     # Test data (valid entry)
     user_id = 1
     question_id = 101
