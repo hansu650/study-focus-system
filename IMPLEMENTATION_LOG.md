@@ -403,3 +403,9 @@ Record completed backend, frontend, and desktop-guard milestones, plus debugging
 2. Added extra demo accounts across both schools and colleges so the day leaderboard looks fuller and no longer appears nearly empty during teacher demos.
 3. Updated `seed_demo.ps1` to load the daily-question migration and the richer showcase seed set by default, so a fresh deployment can reach the same visible state as local testing with one command.
 4. Updated `seed_leaderboard_demo.ps1` and `DEPLOYMENT.md` so existing environments can refresh only the showcase dataset without re-running the full schema bootstrap.
+
+## Sprint 4 Guide Preference Mode - 2026-03-25
+1. Added a second popup after monitoring consent so each login session can choose `New User` or `Experienced User`.
+2. `New User` now shows a simple three-step guide card at the top of the Focus, Rankings, Break Space, Rewards, and Feedback pages.
+3. `Experienced User` keeps only the normal page header and hides the extra guide cards, which matches the lighter teacher-demo flow.
+4. Bumped the frontend asset version to `sprint4r23` so the new guide-mode popup and page-guide layout can break through cached static files.

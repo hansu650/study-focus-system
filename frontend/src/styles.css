@@ -4315,6 +4315,35 @@ body[data-page="learning"] .learning-card {
   gap: 1rem;
 }
 
+.page-guide-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.page-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.page-guide-grid > div {
+  padding: 1rem 1.05rem;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.54);
+  border: 1px solid rgba(29, 138, 112, 0.12);
+}
+
+.page-guide-grid h4 {
+  margin: 0 0 0.55rem;
+  font-size: 1.08rem;
+  font-family: Aptos, "Gill Sans", "Trebuchet MS", sans-serif;
+}
+
+.page-guide-grid p {
+  margin: 0;
+}
+
 .learning-manual-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -4527,6 +4556,55 @@ body.browser-violation-open {
   overflow: hidden;
 }
 
+body.guide-preference-open {
+  overflow: hidden;
+}
+
+.guide-preference-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1190;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgba(15, 23, 42, 0.24);
+  backdrop-filter: blur(10px);
+}
+
+.guide-preference-modal[hidden] {
+  display: none;
+}
+
+.guide-preference-modal__card {
+  width: min(100%, 34rem);
+  display: grid;
+  gap: 1rem;
+  padding: 1.4rem;
+  border-radius: 24px;
+}
+
+.guide-preference-modal__head h3 {
+  margin: 0;
+}
+
+.guide-preference-modal__body {
+  margin: 0;
+  line-height: 1.65;
+  color: #334155;
+}
+
+.guide-preference-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.guide-preference-modal__actions .ghost-button,
+.guide-preference-modal__actions .primary-button {
+  min-width: 9.5rem;
+}
+
 .browser-violation-modal {
   position: fixed;
   inset: 0;
@@ -4584,6 +4662,7 @@ body.browser-violation-open {
 @media (max-width: 1100px) {
   body:not([data-page="landing"]) .page-shell,
   body[data-page="learning"] .dashboard-overview,
+  .page-guide-grid,
   .learning-manual-grid,
   body[data-page="focus"] .focus-top-grid {
     grid-template-columns: 1fr;

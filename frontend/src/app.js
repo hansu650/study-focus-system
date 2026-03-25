@@ -9,6 +9,7 @@
   leaderboardCollegeId: "study_focus_leaderboard_college_id",
   desktopConsent: "study_focus_desktop_consent",
   browserConsent: "study_focus_browser_consent",
+  guideMode: "study_focus_guide_mode",
   browserAwayState: "study_focus_browser_away_state",
   browserViolationNotice: "study_focus_browser_violation_notice",
   lastDemoUsername: "study_focus_last_demo_username",
@@ -32,7 +33,7 @@ function getDefaultApiBase() {
 const DEFAULT_API_BASE = getDefaultApiBase();
 const DEFAULT_DEMO_PASSWORD = "StudyFocus123!";
 const DEFAULT_LOGIN_DEMO_USERNAME = "hubu_mjc_se_101";
-const APP_PAGE_VERSION = "sprint4r22";
+const APP_PAGE_VERSION = "sprint4r23";
 const FOCUS_PLAN_STORAGE_PREFIX = "study_focus_focus_plan_";
 const CURRENT_PAGE = document.body.dataset.page || "landing";
 const MAX_BLOCKED_APP_OPTIONS = 48;
@@ -54,6 +55,100 @@ const DESKTOP_APP_NAME_TRANSLATIONS = {
     ["wechat", "WeChat"],
     ["qq", "QQ"],
   ]),
+};
+const GUIDE_CONTAINER_SELECTORS = {
+  focus: ".workbench-main",
+  rankings: ".workbench-side",
+  learning: ".workbench-main",
+  rewards: ".workbench-side",
+  feedback: ".workbench-side",
+};
+const PAGE_GUIDES = {
+  focus: {
+    title: "How to use this page",
+    steps: [
+      {
+        title: "Start a session",
+        description: "Set the time and choose the apps and websites you want to block.",
+      },
+      {
+        title: "Allow monitoring",
+        description: "Turn on monitoring so the system can check whether you leave the study task.",
+      },
+      {
+        title: "Check the result",
+        description: "When the session ends, review the log and your recent sessions.",
+      },
+    ],
+  },
+  rankings: {
+    title: "How to use this page",
+    steps: [
+      {
+        title: "Choose the time",
+        description: "Use day, month, or year to change the ranking time range.",
+      },
+      {
+        title: "Choose who to compare",
+        description: "Switch between college, school, and all schools.",
+      },
+      {
+        title: "Read the list",
+        description: "Check the ranking list to compare points and focus time.",
+      },
+    ],
+  },
+  learning: {
+    title: "How to use this page",
+    steps: [
+      {
+        title: "Answer the question",
+        description: "Read the daily question and choose one answer.",
+      },
+      {
+        title: "Get points",
+        description: "If your answer is correct, the system adds points to your account.",
+      },
+      {
+        title: "Ask AI for help",
+        description: "Use the chat box when you want a short explanation during a break.",
+      },
+    ],
+  },
+  rewards: {
+    title: "How to use this page",
+    steps: [
+      {
+        title: "Set the code details",
+        description: "Enter the store name, points cost, print pages, and valid time.",
+      },
+      {
+        title: "Generate a code",
+        description: "Create a reward code and check the newest result at the top.",
+      },
+      {
+        title: "Check your records",
+        description: "Use the list below to review your recent reward codes.",
+      },
+    ],
+  },
+  feedback: {
+    title: "How to use this page",
+    steps: [
+      {
+        title: "Choose a type",
+        description: "Pick the category that best matches your feedback.",
+      },
+      {
+        title: "Explain it clearly",
+        description: "Write a short title and describe the problem or idea in simple words.",
+      },
+      {
+        title: "Send it",
+        description: "Submit the form and check the recent list to review what you sent.",
+      },
+    ],
+  },
 };
 
 function ensureApiV1Suffix(value) {
@@ -199,6 +294,8 @@ const state = {
     awayStartedAt: 0,
     awayTrigger: "",
   },
+  guideMode: readGuideMode(),
+  guidePromptInFlight: false,
 };
 
 const uiMotion = {
@@ -316,6 +413,7 @@ async function bootstrap() {
 
   updateAuthView();
   renderDesktopStatus();
+  renderPageGuide();
   renderFocusBlockerControls();
   renderFocusPlanner();
   flushBrowserViolationNotice();
@@ -334,6 +432,7 @@ async function bootstrap() {
   }
 
   if (state.token) {
+    await ensureGuidePreferenceSelected();
     await refreshDashboard();
     if (CURRENT_PAGE === "focus") {
       await handleBrowserModeReturn();
@@ -351,6 +450,146 @@ function applyPageMeta() {
   elements.headlineLead.hidden = !meta.lead;
   elements.headlineTags.innerHTML = "";
   elements.headlineTags.hidden = true;
+}
+
+function renderPageGuide() {
+  const guide = PAGE_GUIDES[CURRENT_PAGE];
+  const containerSelector = GUIDE_CONTAINER_SELECTORS[CURRENT_PAGE];
+  const existingCard = document.querySelector("#page-guide-card, .focus-guide-card, .learning-manual-card, .rewards-guide-card, .rankings-guide-card, .feedback-guide-card");
+
+  if (!guide || !containerSelector) {
+    if (existingCard) {
+      existingCard.hidden = true;
+    }
+    return;
+  }
+
+  const container = document.querySelector(containerSelector);
+  if (!container) {
+    return;
+  }
+
+  const card = existingCard || document.createElement("article");
+  if (!existingCard) {
+    card.className = "surface page-guide-card";
+  }
+
+  card.id = "page-guide-card";
+  card.classList.add("page-guide-card");
+  card.innerHTML = `
+    <div class="panel-head">
+      <h3>${escapeHtml(guide.title)}</h3>
+    </div>
+    <div class="page-guide-grid">
+      ${guide.steps.map((step) => `
+        <div>
+          <h4>${escapeHtml(step.title)}</h4>
+          <p>${escapeHtml(step.description)}</p>
+        </div>
+      `).join("")}
+    </div>
+  `;
+
+  container.prepend(card);
+  card.hidden = !(Boolean(state.token) && state.guideMode === "beginner");
+}
+
+async function ensureGuidePreferenceSelected() {
+  if (!state.token || CURRENT_PAGE === "landing") {
+    renderPageGuide();
+    return "";
+  }
+
+  if (!PAGE_GUIDES[CURRENT_PAGE]) {
+    renderPageGuide();
+    return state.guideMode;
+  }
+
+  if (state.guideMode) {
+    renderPageGuide();
+    return state.guideMode;
+  }
+
+  if (state.guidePromptInFlight) {
+    return "";
+  }
+
+  state.guidePromptInFlight = true;
+
+  try {
+    const mode = await promptGuidePreference();
+    if (!mode) {
+      renderPageGuide();
+      return "";
+    }
+
+    sessionStorage.setItem(STORAGE_KEYS.guideMode, mode);
+    state.guideMode = mode;
+    renderPageGuide();
+    return mode;
+  } finally {
+    state.guidePromptInFlight = false;
+  }
+}
+
+function promptGuidePreference() {
+  const overlay = ensureGuidePreferenceModal();
+  overlay.hidden = false;
+  document.body.classList.add("guide-preference-open");
+
+  return new Promise((resolve) => {
+    const handleClick = (event) => {
+      const button = event.target.closest("[data-guide-mode]");
+      if (!button) {
+        return;
+      }
+
+      overlay.hidden = true;
+      document.body.classList.remove("guide-preference-open");
+      overlay.removeEventListener("click", handleClick);
+      resolve(button.dataset.guideMode || "");
+    };
+
+    overlay.addEventListener("click", handleClick);
+  });
+}
+
+function ensureGuidePreferenceModal() {
+  let overlay = document.querySelector("#guide-preference-modal");
+  if (overlay) {
+    return overlay;
+  }
+
+  overlay = document.createElement("div");
+  overlay.id = "guide-preference-modal";
+  overlay.className = "guide-preference-modal";
+  overlay.hidden = true;
+  overlay.innerHTML = `
+    <div class="guide-preference-modal__card surface" role="dialog" aria-modal="true" aria-labelledby="guide-preference-title">
+      <div class="guide-preference-modal__head">
+        <h3 id="guide-preference-title">Do you want page guides?</h3>
+      </div>
+      <p class="guide-preference-modal__body">
+        Choose New User if you want simple guides at the top of each page. Choose Experienced User if you already know how to use the system.
+      </p>
+      <div class="guide-preference-modal__actions">
+        <button type="button" class="ghost-button" data-guide-mode="expert">Experienced User</button>
+        <button type="button" class="primary-button" data-guide-mode="beginner">New User</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+function readGuideMode() {
+  try {
+    const value = sessionStorage.getItem(STORAGE_KEYS.guideMode);
+    return value === "beginner" || value === "expert" ? value : "";
+  } catch {
+    return "";
+  }
 }
 
 function enforceRouteBoundary() {
@@ -1145,6 +1384,7 @@ function updateAuthView() {
 
   renderLeaderboardTabs();
   renderRunningSession();
+  renderPageGuide();
   renderFocusBlockerControls();
   renderFocusPlanner();
 }
@@ -2696,6 +2936,8 @@ async function requestDesktopMonitoringConsent({ showSuccessToast = true } = {})
     return false;
   }
 
+  await ensureGuidePreferenceSelected();
+
   if (hasDesktopConsent()) {
     return true;
   }
@@ -2745,6 +2987,8 @@ async function requestBrowserMonitoringConsent({ showSuccessToast = true } = {})
   if (state.desktop.available) {
     return false;
   }
+
+  await ensureGuidePreferenceSelected();
 
   if (hasBrowserMonitoringConsent()) {
     return true;
@@ -3085,6 +3329,7 @@ function clearDesktopConsent() {
   try {
     sessionStorage.removeItem(STORAGE_KEYS.desktopConsent);
     sessionStorage.removeItem(STORAGE_KEYS.browserConsent);
+    sessionStorage.removeItem(STORAGE_KEYS.guideMode);
     sessionStorage.removeItem(STORAGE_KEYS.browserViolationNotice);
   } catch {
     // Ignore storage errors for private sessions.
@@ -3094,8 +3339,11 @@ function clearDesktopConsent() {
   state.desktop.promptInFlight = false;
   state.web.consent = false;
   state.web.promptInFlight = false;
+  state.guideMode = "";
+  state.guidePromptInFlight = false;
   clearBrowserAwayState();
   clearBrowserViolationTimer();
+  renderPageGuide();
 }
 
 function readBrowserConsentStatus() {
