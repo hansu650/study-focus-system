@@ -118,6 +118,19 @@ Record completed backend, frontend, and desktop-guard milestones, plus debugging
 3. Focus flow passed: start -> complete -> points settled.
 4. Redeem flow passed: create -> verify -> cancel(second order) -> ledger consistency.
 5. Learning flow passed:
+
+## 2026-03-25 Update
+1. Simplified the focus page by removing extra small labels and hiding the timer-side session summary chips that were cluttering the layout.
+2. Reworked blocked website entry on the focus page into repeatable input rows so users can add multiple websites one by one.
+3. Added desktop-side app list IPC plumbing so the focus page can request a selectable app list from Electron instead of asking users to guess process names manually.
+4. Added frontend blocked-app search, refresh handling, and multi-select state management for the new focus-session setup flow.
+5. Fixed the Windows app-list PowerShell script so Electron can actually load selectable apps, and added an app-list load event to the focus-page guard log.
+6. Hid the remaining focus-page headline banner and simplified the focus blocker labels to plain "Apps" and "Websites".
+7. Simplified app labels by removing `.exe` from the UI and set the Windows PowerShell output encoding to UTF-8 so Chinese app names can display correctly.
+8. Added English display-name mappings for common Chinese desktop apps and changed the app selection cards to a larger single-line layout with ellipsis for long names.
+9. Restored the top guide banner on the Learning page so it matches the Rankings page instead of leaving an empty strip above the focus controls.
+10. Simplified the Learning page guide header to one clear sentence and hid the extra subtext on that page.
+11. Compressed the Learning page hero into a simple guide header by hiding the image and hero status cards there, then replaced the long title with a shorter plain sentence.
    - daily question returns `200`
    - ai-chat returns `200` with configured ModelScope credentials
 6. Frontend delivery smoke test passed:

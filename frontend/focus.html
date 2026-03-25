@@ -1,17 +1,17 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Study Focus Atlas</title>
-    <link rel="stylesheet" href="./src/styles.css?v=sprint4r16" />
+    <title>Study Focus System</title>
+    <link rel="stylesheet" href="./src/styles.css?v=sprint4r22" />
   </head>
   <body data-page="focus">
     <div class="page-shell">
       <aside class="studio-rail">
         <section class="surface rail-brand">
-          <p class="eyebrow">Study Focus Atlas</p>
-          <h1>Campus Focus Atlas</h1>
+          <p class="eyebrow">Study Focus System</p>
+          <h1>Campus Focus System</h1>
           <p class="lead-copy">
             A multi-page study system with focus control, leaderboard views, redeem codes, AI breaks, and desktop guard feedback.
           </p>
@@ -31,12 +31,12 @@
 
         <nav class="surface rail-map">
           <p class="eyebrow">Pages</p>
-          <a class="rail-link rail-link-landing" href="./index.html?v=sprint4r16">Login</a>
-          <a class="rail-link rail-link-focus" href="./focus.html?v=sprint4r16">Learning</a>
-          <a class="rail-link rail-link-rankings" href="./rankings.html?v=sprint4r16">Rankings</a>
-          <a class="rail-link rail-link-learning" href="./learning.html?v=sprint4r16">Break Space</a>
-          <a class="rail-link rail-link-rewards" href="./rewards.html?v=sprint4r16">Rewards</a>
-          <a class="rail-link rail-link-feedback" href="./feedback.html?v=sprint4r16">Feedback</a>
+          <a class="rail-link rail-link-landing" href="./index.html?v=sprint4r22">Login</a>
+          <a class="rail-link rail-link-focus" href="./focus.html?v=sprint4r22">Learning</a>
+          <a class="rail-link rail-link-rankings" href="./rankings.html?v=sprint4r22">Rankings</a>
+          <a class="rail-link rail-link-learning" href="./learning.html?v=sprint4r22">Break Space</a>
+          <a class="rail-link rail-link-rewards" href="./rewards.html?v=sprint4r22">Rewards</a>
+          <a class="rail-link rail-link-feedback" href="./feedback.html?v=sprint4r22">Feedback</a>
         </nav>
 
         <section class="surface rail-reference">
@@ -223,13 +223,13 @@
             <article class="surface metric-panel points-panel">
               <span class="meta-label">Points</span>
               <strong id="points-balance">0</strong>
-              <p id="points-note">Waiting for first settled session.</p>
+              <p id="points-note" hidden></p>
             </article>
 
             <article class="surface metric-panel minutes-panel">
               <span class="meta-label">Focus Minutes</span>
               <strong id="focus-minutes-total">0</strong>
-              <p id="focus-note">No completed focus block yet.</p>
+              <p id="focus-note" hidden></p>
             </article>
 
             <article class="surface metric-panel guard-summary-panel">
@@ -240,27 +240,27 @@
           </section>
 
           <section class="dashboard-hub">
-            <a class="surface hub-card hub-card-focus" href="./focus.html?v=sprint4r16">
+            <a class="surface hub-card hub-card-focus" href="./focus.html?v=sprint4r22">
               <p class="eyebrow">Page</p>
               <h3>Learning</h3>
               <p class="hint-copy">Run sessions, monitor the live timer, and inspect guard events without distraction from other modules.</p>
             </a>
-            <a class="surface hub-card hub-card-rankings" href="./rankings.html?v=sprint4r16">
+            <a class="surface hub-card hub-card-rankings" href="./rankings.html?v=sprint4r22">
               <p class="eyebrow">Page</p>
               <h3>Rankings</h3>
               <p class="hint-copy">Switch by day, month, year, school, or college and keep the ranking presentation isolated from the timer.</p>
             </a>
-            <a class="surface hub-card hub-card-learning" href="./learning.html?v=sprint4r16">
+            <a class="surface hub-card hub-card-learning" href="./learning.html?v=sprint4r22">
               <p class="eyebrow">Page</p>
               <h3>Break Space</h3>
               <p class="hint-copy">Read the daily question and ask AI in a dedicated break-space instead of mixing it into the control panel.</p>
             </a>
-            <a class="surface hub-card hub-card-rewards" href="./rewards.html?v=sprint4r16">
+            <a class="surface hub-card hub-card-rewards" href="./rewards.html?v=sprint4r22">
               <p class="eyebrow">Page</p>
               <h3>Rewards</h3>
               <p class="hint-copy">Generate redeem codes and review coupon output in a calmer, task-specific surface.</p>
             </a>
-            <a class="surface hub-card hub-card-feedback" href="./feedback.html?v=sprint4r16">
+            <a class="surface hub-card hub-card-feedback" href="./feedback.html?v=sprint4r22">
               <p class="eyebrow">Page</p>
               <h3>Feedback</h3>
               <p class="hint-copy">Collect product notes and UI issues on a page that does not compete with rankings or focus controls.</p>
@@ -270,17 +270,11 @@
           <section class="dashboard-workbench">
             <div class="workbench-main">
               <article class="surface focus-lab-card">
-                <div class="panel-head">
-                  <p class="eyebrow">Learning</p>
-                  <h3>Run the timer, trigger guard rules, and keep the session lifecycle readable.</h3>
-                </div>
-
                 <div class="focus-top-grid">
                   <section class="timer-slab">
-                    <span class="meta-label">Live Countdown</span>
                     <strong id="focus-live-timer">00:00:00</strong>
-                    <p id="focus-live-status">No running session.</p>
-                    <div id="running-session-summary" class="running-session-summary">No running session.</div>
+                    <p id="focus-live-status" hidden></p>
+                    <div id="running-session-summary" class="running-session-summary" hidden></div>
                   </section>
 
                   <form id="focus-start-form" class="stack-form focus-form focus-form-grid">
@@ -289,32 +283,38 @@
                       <input name="planned_minutes" type="number" value="25" min="1" max="240" required />
                     </label>
 
-                    <label>
-                      <span>Blocked Apps</span>
-                      <input name="blocked_apps" type="text" placeholder="steam.exe, qqmusic.exe, wechat.exe" />
-                    </label>
+                    <div class="focus-form-action">
+                      <button class="primary-button" type="submit">Start Focus Session</button>
+                    </div>
 
-                    <label>
-                      <span>Blocked Sites</span>
-                      <input name="blocked_sites" type="text" placeholder="youtube.com, bilibili.com, douyin.com" />
-                    </label>
+                    <div class="focus-form-wide block-picker">
+                      <div class="block-picker-head">
+                        <span>Apps</span>
+                        <button id="load-blocked-apps-btn" class="ghost-button" type="button">Load Apps</button>
+                      </div>
+                      <input id="blocked-app-search" type="search" placeholder="Search apps" autocomplete="off" />
+                      <div id="blocked-app-selected" class="block-chip-list" hidden></div>
+                      <div id="blocked-app-options" class="block-option-list block-option-list-apps"></div>
+                      <input id="blocked-apps-value" name="blocked_apps" type="hidden" value="" />
+                    </div>
 
-                    <button class="primary-button" type="submit">Start Focus Session</button>
+                    <div class="focus-form-wide block-picker">
+                      <div class="block-picker-head">
+                        <span>Websites</span>
+                        <button id="add-blocked-site-btn" class="ghost-button" type="button">Add Website</button>
+                      </div>
+                      <div id="blocked-site-fields" class="block-site-fields"></div>
+                      <input id="blocked-sites-value" name="blocked_sites" type="hidden" value="" />
+                    </div>
                   </form>
                 </div>
 
                 <section class="surface inset-card focus-plan-card">
-                  <div class="question-header">
-                    <div>
-                      <span class="pill">Plan Notebook</span>
-                      <span class="pill soft-pill">Local Only</span>
-                    </div>
-                  </div>
                   <form id="focus-plan-form" class="focus-plan-form">
-                    <input name="task" type="text" maxlength="120" placeholder="Add one task you want to finish in this session." />
+                    <input name="task" type="text" maxlength="120" placeholder="Add a task for this session." />
                     <button class="ghost-button" type="submit">Add</button>
                   </form>
-                  <div id="focus-plan-list" class="focus-plan-list empty-state">No plan items yet.</div>
+                  <div id="focus-plan-list" class="focus-plan-list" hidden></div>
                 </section>
 
                 <div class="session-actions">
@@ -325,11 +325,8 @@
 
                 <div class="focus-bottom-grid">
                   <div class="surface inset-card desktop-guard-box">
-                    <div class="question-header">
-                      <div>
-                      <span class="pill">Focus Monitor</span>
-                      <span class="pill soft-pill">Web + Desktop</span>
-                      </div>
+                    <div class="table-header">
+                      <h4>Focus Monitor</h4>
                     </div>
                     <div id="guard-support-badges" class="support-badges"></div>
                     <div class="table-card guard-log-card">
@@ -351,24 +348,22 @@
 
               <article class="surface focus-guide-card">
                 <div class="panel-head">
-                  <p class="eyebrow">Learning Guide</p>
-                  <h3>Run the session first, then use the notes below to stay on track.</h3>
+                  <h3>How to use this page</h3>
                 </div>
                 <div class="focus-guide-grid">
                   <div>
-                    <span class="meta-label">1</span>
-                    <p>Write one to three short tasks in the notebook so this focus block has a clear target.</p>
+                    <h4>Start a session</h4>
+                    <p>Set the time, choose blocked apps and sites, and start your focus session.</p>
                   </div>
                   <div>
-                    <span class="meta-label">2</span>
-                    <p>On the website, consent enables page-leave checking. In Electron, consent enables stronger app and site monitoring.</p>
+                    <h4>Allow monitoring</h4>
+                    <p>Website mode checks whether you leave this page. Desktop mode can also check apps and sites.</p>
                   </div>
                   <div>
-                    <span class="meta-label">3</span>
-                    <p>When the block ends, mark finished tasks with a check and review the guard log if anything interrupted you.</p>
+                    <h4>Finish and review</h4>
+                    <p>Mark finished tasks and check the guard log if the session stopped early.</p>
                   </div>
                 </div>
-                <p class="hint-copy focus-guide-intro">This page now supports two modes: website page-focus checking and desktop guard monitoring, both behind user consent.</p>
               </article>
 
               <article class="surface learning-card">
@@ -552,7 +547,7 @@
 
     <div id="toast" class="toast" hidden></div>
 
-    <script type="module" src="./src/app.js?v=sprint4r16"></script>
+    <script type="module" src="./src/app.js?v=sprint4r22"></script>
   </body>
 </html>
 

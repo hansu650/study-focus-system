@@ -32,9 +32,29 @@ function getDefaultApiBase() {
 const DEFAULT_API_BASE = getDefaultApiBase();
 const DEFAULT_DEMO_PASSWORD = "StudyFocus123!";
 const DEFAULT_LOGIN_DEMO_USERNAME = "hubu_mjc_se_101";
-const APP_PAGE_VERSION = "sprint4r17";
+const APP_PAGE_VERSION = "sprint4r22";
 const FOCUS_PLAN_STORAGE_PREFIX = "study_focus_focus_plan_";
 const CURRENT_PAGE = document.body.dataset.page || "landing";
+const MAX_BLOCKED_APP_OPTIONS = 48;
+const DESKTOP_APP_NAME_TRANSLATIONS = {
+  byDisplayName: new Map([
+    ["百度网盘", "Baidu Netdisk"],
+    ["电脑管家", "Tencent PC Manager"],
+    ["腾讯会议", "Tencent Meeting"],
+    ["网易有道翻译", "Youdao Translate"],
+    ["微信", "WeChat"],
+    ["微软OfficePLUS", "Microsoft OfficePLUS"],
+    ["Windows 11 安装助手", "Windows 11 Installation Assistant"],
+  ]),
+  byProcessName: new Map([
+    ["baidunetdisk", "Baidu Netdisk"],
+    ["qqpctray", "Tencent PC Manager"],
+    ["wemeetapp", "Tencent Meeting"],
+    ["youdaodict", "Youdao Translate"],
+    ["wechat", "WeChat"],
+    ["qq", "QQ"],
+  ]),
+};
 
 function ensureApiV1Suffix(value) {
   const raw = String(value || "").trim().replace(/\/+$/u, "");
@@ -76,59 +96,58 @@ function normalizeApiBaseForCurrentHost(value) {
 
 const PAGE_META = {
   landing: {
-    browserTitle: "Study Focus Atlas",
+    browserTitle: "Study Focus System",
     eyebrow: "Welcome",
-    title: "A campus study system that finally behaves like separate workspaces, not one crowded screen.",
+    title: "This system helps students focus, earn points, and use study support tools.",
     lead:
-      "Login and registration stay on the landing page. After that, focus, rankings, learning, rewards, and feedback each get a dedicated destination.",
+      "Use this page to register or log in. After that, you can open the focus, rankings, break space, rewards, and feedback pages.",
     tags: ["Login", "Register", "Seeded Accounts", "Campus Demo", "Desktop Guard"],
   },
   home: {
-    browserTitle: "Studio Home | Study Focus Atlas",
+    browserTitle: "Studio Home | Study Focus System",
     eyebrow: "Studio Home",
-    title: "Choose the workspace you need and leave the rest out of your way.",
+    title: "This is the main dashboard for your study account.",
     lead:
-      "This overview page keeps the profile, totals, and jump cards visible while the heavy task surfaces live on their own routes.",
+      "You can check your profile, focus time, points, and open the page you want to use from here.",
     tags: ["Overview", "Quick Jumps", "Campus Metrics", "Cleaner Demo", "Multi-Page"],
   },
   focus: {
-    browserTitle: "Learning | Study Focus Atlas",
+    browserTitle: "Learning | Study Focus System",
     eyebrow: "Learning",
-    title: "Use one learning page to run the timer, plan tasks, and review guard status.",
-    lead:
-      "This route keeps the timer, planner, consent gate, and guard log together so the focus flow is easier to explain and use.",
+    title: "Set the timer and choose what you want to block.",
+    lead: "",
     tags: ["Learning", "Timer", "Plan Notebook", "Guard Events", "Blocked Sites"],
   },
   rankings: {
-    browserTitle: "Rankings | Study Focus Atlas",
+    browserTitle: "Rankings | Study Focus System",
     eyebrow: "Rankings",
-    title: "School and college leaderboards deserve a page that looks presentable in a real demo.",
+    title: "Use this page to view school and college rankings.",
     lead:
-      "Filters, rank cards, and the point ledger are isolated here so the school comparison view is easier to read and explain.",
+      "You can switch the time period and ranking scope, then check leaderboard results and point records.",
     tags: ["School Scope", "College Scope", "Day Month Year", "Point Ledger", "Demo Ready"],
   },
   learning: {
-    browserTitle: "Break Space | Study Focus Atlas",
+    browserTitle: "Break Space | Study Focus System",
     eyebrow: "Break Space",
-    title: "Keep the daily question and AI break-space together instead of burying them under operations.",
+    title: "Use this page for the daily question and AI study chat.",
     lead:
-      "This page is calmer by design: question at the top, chat below, and no ranking or redeem noise fighting for attention.",
+      "Answer the daily question at the top and use the AI chat below when you need help during a break.",
     tags: ["Daily Question", "AI Chat", "Break Space", "Study Support", "Lighter Layout"],
   },
   rewards: {
-    browserTitle: "Rewards | Study Focus Atlas",
+    browserTitle: "Rewards | Study Focus System",
     eyebrow: "Rewards",
-    title: "Coupon generation should feel like a clean student action, not a crowded side widget.",
+    title: "Use this page to create and view redeem codes.",
     lead:
-      "The rewards route centers the redeem form, latest coupon, and recent generated codes so the printing benefit is easy to demonstrate.",
+      "You can spend points, copy the latest code, and review your recent redeem records here.",
     tags: ["Redeem Code", "Point Spend", "Coupon Copy", "Print Shop", "Student Flow"],
   },
   feedback: {
-    browserTitle: "Feedback | Study Focus Atlas",
+    browserTitle: "Feedback | Study Focus System",
     eyebrow: "Feedback",
-    title: "A product loop page for UI notes, bug reports, and ideas from real student use.",
+    title: "Use this page to send feedback and read recent messages.",
     lead:
-      "Suggestions are separated from the study controls so feedback feels intentional and the recent messages list stays readable.",
+      "Report bugs, share ideas, and check recent feedback without leaving the system.",
     tags: ["Suggestions", "UI Notes", "Bug Reports", "Ideas", "Recent Messages"],
   },
 };
@@ -157,6 +176,10 @@ const state = {
   focusPlanItems: [],
   autoCompleteSessionId: 0,
   guardInterruptInFlight: false,
+  blockers: {
+    selectedApps: [],
+    selectedSites: [],
+  },
   desktop: {
     available: Boolean(window.studyFocusDesktop?.isAvailable),
     consent: readDesktopConsentStatus(),
@@ -164,6 +187,10 @@ const state = {
     eventLog: [],
     unsubscribe: null,
     promptInFlight: false,
+    appOptions: [],
+    appOptionsLoaded: false,
+    appOptionsLoading: false,
+    appSearch: "",
   },
   web: {
     consent: readBrowserConsentStatus(),
@@ -198,6 +225,14 @@ const elements = {
   loginForm: document.querySelector("#login-form"),
   registerForm: document.querySelector("#register-form"),
   focusStartForm: document.querySelector("#focus-start-form"),
+  loadBlockedAppsBtn: document.querySelector("#load-blocked-apps-btn"),
+  blockedAppSearch: document.querySelector("#blocked-app-search"),
+  blockedAppOptions: document.querySelector("#blocked-app-options"),
+  blockedAppSelected: document.querySelector("#blocked-app-selected"),
+  blockedAppsValue: document.querySelector("#blocked-apps-value"),
+  addBlockedSiteBtn: document.querySelector("#add-blocked-site-btn"),
+  blockedSiteFields: document.querySelector("#blocked-site-fields"),
+  blockedSitesValue: document.querySelector("#blocked-sites-value"),
   focusPlanForm: document.querySelector("#focus-plan-form"),
   focusPlanList: document.querySelector("#focus-plan-list"),
   interruptSessionBtn: document.querySelector("#interrupt-session-btn"),
@@ -281,6 +316,7 @@ async function bootstrap() {
 
   updateAuthView();
   renderDesktopStatus();
+  renderFocusBlockerControls();
   renderFocusPlanner();
   flushBrowserViolationNotice();
 
@@ -312,6 +348,7 @@ function applyPageMeta() {
   elements.headlineEyebrow.textContent = meta.eyebrow;
   elements.headlineTitle.textContent = meta.title;
   elements.headlineLead.textContent = meta.lead;
+  elements.headlineLead.hidden = !meta.lead;
   elements.headlineTags.innerHTML = "";
   elements.headlineTags.hidden = true;
 }
@@ -414,9 +451,8 @@ function initializePenguinLoader() {
   overlay.innerHTML = `
     <div class="penguin-loader-card">
       <img class="penguin-loader-icon" src="./assets/penguin-mark.svg" alt="" />
-      <p class="penguin-loader-kicker">Study Focus Atlas</p>
-      <h2>Penguin mode is warming up the desk.</h2>
-      <p class="penguin-loader-copy">Sea, grass, dawn, and lavender are being layered into the workspace.</p>
+      <p class="penguin-loader-kicker">Study Focus System</p>
+      <h2>The system is loading.</h2>
       <div class="penguin-loader-bar"><span></span></div>
     </div>
   `;
@@ -446,6 +482,298 @@ function initializePenguinLoader() {
   }, 15000);
 
   return true;
+}
+
+function renderFocusBlockerControls() {
+  renderBlockedSiteFields();
+  renderSelectedBlockedApps();
+  renderBlockedAppOptions();
+  syncBlockedSelectionInputs();
+}
+
+function syncBlockedSelectionInputs() {
+  if (elements.blockedAppsValue) {
+    elements.blockedAppsValue.value = state.blockers.selectedApps.join(",");
+  }
+
+  if (elements.blockedSitesValue) {
+    elements.blockedSitesValue.value = state.blockers.selectedSites
+      .map(normalizeBlockedSite)
+      .filter(Boolean)
+      .join(",");
+  }
+}
+
+function ensureBlockedSiteRows() {
+  if (!Array.isArray(state.blockers.selectedSites) || !state.blockers.selectedSites.length) {
+    state.blockers.selectedSites = [""];
+  }
+}
+
+function renderBlockedSiteFields() {
+  if (!elements.blockedSiteFields) {
+    return;
+  }
+
+  ensureBlockedSiteRows();
+  elements.blockedSiteFields.innerHTML = state.blockers.selectedSites
+    .map((value, index) => {
+      const removeDisabled = state.blockers.selectedSites.length === 1 ? " disabled" : "";
+      return `
+        <div class="block-site-row">
+          <input
+            type="text"
+            data-site-index="${index}"
+            value="${escapeHtml(value)}"
+            placeholder="Website ${index + 1}"
+            autocomplete="off"
+          />
+          <button type="button" class="ghost-button block-site-remove"${removeDisabled} data-remove-site-row="${index}">Remove</button>
+        </div>
+      `;
+    })
+    .join("");
+  syncBlockedSelectionInputs();
+}
+
+function updateBlockedSiteRow(index, value) {
+  ensureBlockedSiteRows();
+  if (!Number.isInteger(index) || index < 0 || index >= state.blockers.selectedSites.length) {
+    return;
+  }
+
+  state.blockers.selectedSites[index] = String(value || "").trim();
+  syncBlockedSelectionInputs();
+}
+
+function addBlockedSiteField() {
+  ensureBlockedSiteRows();
+  state.blockers.selectedSites = [...state.blockers.selectedSites, ""];
+  renderFocusBlockerControls();
+}
+
+function removeBlockedSiteField(index) {
+  ensureBlockedSiteRows();
+  if (!Number.isInteger(index) || index < 0 || index >= state.blockers.selectedSites.length) {
+    return;
+  }
+
+  const next = state.blockers.selectedSites.filter((_, itemIndex) => itemIndex !== index);
+  state.blockers.selectedSites = next.length ? next : [""];
+  renderFocusBlockerControls();
+}
+
+function renderSelectedBlockedApps() {
+  if (!elements.blockedAppSelected) {
+    return;
+  }
+
+  if (!state.blockers.selectedApps.length) {
+    elements.blockedAppSelected.hidden = true;
+    elements.blockedAppSelected.innerHTML = "";
+    syncBlockedSelectionInputs();
+    return;
+  }
+
+  const labels = new Map(
+    state.desktop.appOptions.map((item) => [item.processName, formatAppOptionLabel(item)])
+  );
+
+  elements.blockedAppSelected.hidden = false;
+  elements.blockedAppSelected.innerHTML = state.blockers.selectedApps
+    .map((processName) => {
+      const label = labels.get(processName) || formatProcessNameLabel(processName);
+      return `<button type="button" class="block-chip" data-remove-app="${escapeHtml(processName)}" title="${escapeHtml(label)}">${escapeHtml(label)}<span aria-hidden="true">×</span></button>`;
+    })
+    .join("");
+  syncBlockedSelectionInputs();
+}
+
+function renderBlockedAppOptions() {
+  if (!elements.blockedAppOptions) {
+    return;
+  }
+
+  updateBlockedAppControls();
+
+  if (!state.desktop.appOptionsLoaded || state.desktop.appOptionsLoading) {
+    elements.blockedAppOptions.innerHTML = "";
+    return;
+  }
+
+  const selected = new Set(state.blockers.selectedApps);
+  const query = state.desktop.appSearch;
+  const filtered = state.desktop.appOptions
+    .filter((item) => {
+      if (!query) {
+        return true;
+      }
+
+      const haystack = `${item.displayName} ${item.originalDisplayName || ""} ${item.processName}`.toLowerCase();
+      return haystack.includes(query);
+    })
+    .slice(0, MAX_BLOCKED_APP_OPTIONS);
+
+  elements.blockedAppOptions.innerHTML = filtered
+    .map((item) => {
+      const selectedClass = selected.has(item.processName) ? " is-selected" : "";
+      const label = formatAppOptionLabel(item);
+      return `<button type="button" class="block-option-button${selectedClass}" data-app-option="${escapeHtml(item.processName)}" title="${escapeHtml(label)}">${escapeHtml(label)}</button>`;
+    })
+    .join("");
+}
+
+function updateBlockedAppControls() {
+  if (elements.loadBlockedAppsBtn) {
+    if (state.desktop.appOptionsLoading) {
+      elements.loadBlockedAppsBtn.textContent = "Loading Apps...";
+    } else if (state.desktop.appOptionsLoaded) {
+      elements.loadBlockedAppsBtn.textContent = "Refresh Apps";
+    } else {
+      elements.loadBlockedAppsBtn.textContent = "Load Apps";
+    }
+  }
+
+  if (elements.blockedAppSearch) {
+    elements.blockedAppSearch.disabled = state.desktop.appOptionsLoading || !state.desktop.appOptionsLoaded;
+    if (!state.desktop.appOptionsLoading && elements.blockedAppSearch.value !== state.desktop.appSearch) {
+      elements.blockedAppSearch.value = state.desktop.appSearch;
+    }
+  }
+}
+
+async function handleLoadBlockedApps() {
+  if (!state.desktop.available) {
+    showToast("Open the desktop app to load your app list.", "error");
+    return;
+  }
+
+  const consentGranted = await requestDesktopMonitoringConsent({ showSuccessToast: false });
+  if (!consentGranted) {
+    return;
+  }
+
+  await ensureDesktopAppOptionsLoaded({ forceRefresh: true });
+}
+
+async function ensureDesktopAppOptionsLoaded({ forceRefresh = false } = {}) {
+  if (!elements.blockedAppOptions || !state.desktop.available || !hasDesktopConsent()) {
+    renderBlockedAppOptions();
+    return;
+  }
+
+  if (state.desktop.appOptionsLoading) {
+    return;
+  }
+
+  if (state.desktop.appOptionsLoaded && !forceRefresh) {
+    renderBlockedAppOptions();
+    return;
+  }
+
+  state.desktop.appOptionsLoading = true;
+  renderBlockedAppOptions();
+
+  try {
+    const items = typeof window.studyFocusDesktop?.listBlockingApps === "function"
+      ? await window.studyFocusDesktop.listBlockingApps()
+      : [];
+    state.desktop.appOptions = normalizeDesktopAppOptions(items);
+    state.desktop.appOptionsLoaded = true;
+    pushGuardEvent({
+      type: "app_list_loaded",
+      detectedAt: new Date().toISOString(),
+      message: `Loaded ${state.desktop.appOptions.length} apps for selection.`,
+    });
+  } catch (error) {
+    state.desktop.appOptions = [];
+    state.desktop.appOptionsLoaded = false;
+    pushGuardEvent({
+      type: "app_list_error",
+      detectedAt: new Date().toISOString(),
+      message: `App list load failed: ${error.message}`,
+    });
+    showToast(`App list load failed: ${error.message}`, "error");
+  } finally {
+    state.desktop.appOptionsLoading = false;
+    renderFocusBlockerControls();
+  }
+}
+
+function normalizeDesktopAppOptions(items) {
+  const seen = new Set();
+  const normalized = [];
+
+  for (const item of Array.isArray(items) ? items : []) {
+    const processName = normalizeBlockedAppName(item?.processName);
+    if (!processName || seen.has(processName)) {
+      continue;
+    }
+
+    seen.add(processName);
+    const originalDisplayName = String(item?.displayName || processName).trim();
+    normalized.push({
+      processName,
+      originalDisplayName,
+      displayName: translateDesktopAppName(processName, originalDisplayName),
+      isRunning: Boolean(item?.isRunning),
+    });
+  }
+
+  return normalized;
+}
+
+function toggleBlockedApp(processName) {
+  const normalized = normalizeBlockedAppName(processName);
+  if (!normalized) {
+    return;
+  }
+
+  if (state.blockers.selectedApps.includes(normalized)) {
+    state.blockers.selectedApps = state.blockers.selectedApps.filter((item) => item !== normalized);
+  } else {
+    state.blockers.selectedApps = [...state.blockers.selectedApps, normalized];
+  }
+
+  renderFocusBlockerControls();
+}
+
+function removeBlockedApp(processName) {
+  const normalized = normalizeBlockedAppName(processName);
+  if (!normalized) {
+    return;
+  }
+
+  state.blockers.selectedApps = state.blockers.selectedApps.filter((item) => item !== normalized);
+  renderFocusBlockerControls();
+}
+
+function formatAppOptionLabel(item) {
+  const displayName = String(item.displayName || "").trim();
+  if (!displayName) {
+    return normalizeBlockedAppName(item.processName);
+  }
+
+  return displayName;
+}
+
+function formatProcessNameLabel(processName) {
+  return normalizeBlockedAppName(processName);
+}
+
+function translateDesktopAppName(processName, displayName) {
+  const normalizedProcessName = normalizeBlockedAppName(processName);
+  const normalizedDisplayName = String(displayName || "").trim();
+
+  if (DESKTOP_APP_NAME_TRANSLATIONS.byDisplayName.has(normalizedDisplayName)) {
+    return DESKTOP_APP_NAME_TRANSLATIONS.byDisplayName.get(normalizedDisplayName);
+  }
+
+  if (DESKTOP_APP_NAME_TRANSLATIONS.byProcessName.has(normalizedProcessName)) {
+    return DESKTOP_APP_NAME_TRANSLATIONS.byProcessName.get(normalizedProcessName);
+  }
+
+  return normalizedDisplayName || normalizedProcessName;
 }
 
 function initializeMotionSystem() {
@@ -595,6 +923,65 @@ function bindEvents() {
     void handleStartFocus(event.currentTarget);
   });
 
+  if (elements.loadBlockedAppsBtn) {
+    elements.loadBlockedAppsBtn.addEventListener("click", () => void handleLoadBlockedApps());
+  }
+
+  if (elements.blockedAppSearch) {
+    elements.blockedAppSearch.addEventListener("input", (event) => {
+      state.desktop.appSearch = String(event.currentTarget.value || "").trim().toLowerCase();
+      renderBlockedAppOptions();
+    });
+  }
+
+  if (elements.blockedAppOptions) {
+    elements.blockedAppOptions.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-app-option]");
+      if (!button) {
+        return;
+      }
+
+      toggleBlockedApp(button.dataset.appOption || "");
+    });
+  }
+
+  if (elements.blockedAppSelected) {
+    elements.blockedAppSelected.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-remove-app]");
+      if (!button) {
+        return;
+      }
+
+      removeBlockedApp(button.dataset.removeApp || "");
+    });
+  }
+
+  if (elements.addBlockedSiteBtn) {
+    elements.addBlockedSiteBtn.addEventListener("click", () => {
+      addBlockedSiteField();
+    });
+  }
+
+  if (elements.blockedSiteFields) {
+    elements.blockedSiteFields.addEventListener("input", (event) => {
+      const input = event.target.closest("[data-site-index]");
+      if (!input) {
+        return;
+      }
+
+      updateBlockedSiteRow(Number(input.dataset.siteIndex), input.value || "");
+    });
+
+    elements.blockedSiteFields.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-remove-site-row]");
+      if (!button) {
+        return;
+      }
+
+      removeBlockedSiteField(Number(button.dataset.removeSiteRow));
+    });
+  }
+
   if (elements.focusPlanForm) {
     elements.focusPlanForm.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -716,6 +1103,7 @@ async function initDesktopBridge() {
     }
 
     state.desktop.status = await window.studyFocusDesktop.getStatus();
+    await ensureDesktopAppOptionsLoaded();
   } catch (error) {
     pushGuardEvent({
       type: "guard_bridge_error",
@@ -757,6 +1145,7 @@ function updateAuthView() {
 
   renderLeaderboardTabs();
   renderRunningSession();
+  renderFocusBlockerControls();
   renderFocusPlanner();
 }
 
@@ -819,6 +1208,9 @@ async function handleLogin(form) {
   state.desktop.eventLog = [];
   state.dailyQuestion = null;
   state.focusPlanItems = [];
+  state.blockers.selectedApps = [];
+  state.blockers.selectedSites = [];
+  state.desktop.appSearch = "";
 
   if (CURRENT_PAGE === "landing") {
     goToPage("focus");
@@ -986,8 +1378,8 @@ async function handleStartFocus(form) {
   const payload = formDataToObject(new FormData(form));
   payload.planned_minutes = Number(payload.planned_minutes);
   payload.lock_mode = "APP_BLOCK";
-  payload.blocked_apps = parseCsvList(payload.blocked_apps);
-  payload.blocked_sites = parseCsvList(payload.blocked_sites);
+  payload.blocked_apps = getSelectedBlockedApps(payload.blocked_apps);
+  payload.blocked_sites = getSelectedBlockedSites(payload.blocked_sites);
 
   const session = await apiFetch("/focus-sessions/start", {
     method: "POST",
@@ -1414,9 +1806,11 @@ function renderProfile() {
 function renderPoints() {
   const points = state.points || { total_points: 0, total_focus_minutes: 0 };
   elements.pointsBalance.textContent = String(points.total_points);
-  elements.pointsNote.textContent = `${state.ledger.length} ledger records loaded.`;
+  elements.pointsNote.textContent = "";
+  elements.pointsNote.hidden = true;
   elements.focusMinutesTotal.textContent = String(points.total_focus_minutes);
-  elements.focusNote.textContent = `${state.sessions.filter((item) => item.status === "COMPLETED").length} completed sessions found.`;
+  elements.focusNote.textContent = "";
+  elements.focusNote.hidden = true;
 }
 
 function renderSessions() {
@@ -1745,7 +2139,9 @@ function renderRunningSession() {
       apps,
       sites
     );
-    elements.focusLiveStatus.textContent = `Started at ${formatDateTime(running.start_at)}`;
+    elements.runningSessionSummary.hidden = true;
+    elements.focusLiveStatus.hidden = true;
+    elements.focusLiveStatus.textContent = "";
     elements.heroTimerState.textContent = running.status;
     startTimer();
     return;
@@ -1763,16 +2159,20 @@ function renderRunningSession() {
       apps,
       sites
     );
+    elements.runningSessionSummary.hidden = true;
     elements.focusLiveTimer.textContent = formatDuration(remainingMs);
-    elements.focusLiveStatus.textContent = `Interrupted at ${formatDateTime(paused.end_at)}. Resume continues from ${formatDuration(remainingMs)} remaining.`;
+    elements.focusLiveStatus.hidden = true;
+    elements.focusLiveStatus.textContent = "";
     elements.heroTimerState.textContent = paused.status;
     stopTimer();
     return;
   }
 
-  elements.runningSessionSummary.textContent = "No running session.";
+  elements.runningSessionSummary.hidden = true;
+  elements.runningSessionSummary.innerHTML = "";
   elements.focusLiveTimer.textContent = "00:00:00";
-  elements.focusLiveStatus.textContent = "No running session.";
+  elements.focusLiveStatus.hidden = true;
+  elements.focusLiveStatus.textContent = "";
   elements.heroTimerState.textContent = "Idle";
   stopTimer();
 }
@@ -2044,11 +2444,18 @@ async function logout() {
   state.feedbacks = [];
   state.dailyQuestion = null;
   state.focusPlanItems = [];
+  state.blockers.selectedApps = [];
+  state.blockers.selectedSites = [];
   state.desktop.eventLog = [];
+  state.desktop.appOptions = [];
+  state.desktop.appOptionsLoaded = false;
+  state.desktop.appOptionsLoading = false;
+  state.desktop.appSearch = "";
   localStorage.removeItem(STORAGE_KEYS.token);
   localStorage.removeItem(STORAGE_KEYS.user);
   localStorage.removeItem(STORAGE_KEYS.activeSession);
   updateAuthView();
+  renderFocusBlockerControls();
   renderFocusPlanner();
   renderDesktopStatus();
 
@@ -2827,18 +3234,21 @@ function renderFocusPlanner() {
   }
 
   if (!isReady) {
-    elements.focusPlanList.className = "focus-plan-list empty-state";
-    elements.focusPlanList.textContent = "Login to keep a local study plan.";
+    elements.focusPlanList.className = "focus-plan-list";
+    elements.focusPlanList.innerHTML = "";
+    elements.focusPlanList.hidden = true;
     return;
   }
 
   if (!state.focusPlanItems.length) {
-    elements.focusPlanList.className = "focus-plan-list empty-state";
-    elements.focusPlanList.textContent = "No plan items yet.";
+    elements.focusPlanList.className = "focus-plan-list";
+    elements.focusPlanList.innerHTML = "";
+    elements.focusPlanList.hidden = true;
     return;
   }
 
   elements.focusPlanList.className = "focus-plan-list";
+  elements.focusPlanList.hidden = false;
   elements.focusPlanList.innerHTML = state.focusPlanItems
     .map((item) => {
       return `
@@ -2905,6 +3315,45 @@ function parseCsvList(value) {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function parseMultiValueList(value) {
+  return String(value || "")
+    .split(/[\n,;]/u)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function normalizeBlockedAppName(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\.exe$/u, "");
+}
+
+function normalizeBlockedSite(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//u, "")
+    .replace(/^www\./u, "")
+    .replace(/\/.*$/u, "");
+}
+
+function getSelectedBlockedApps(rawValue = "") {
+  if (elements.blockedAppsValue) {
+    return [...state.blockers.selectedApps];
+  }
+
+  return parseCsvList(rawValue).map(normalizeBlockedAppName).filter(Boolean);
+}
+
+function getSelectedBlockedSites(rawValue = "") {
+  if (elements.blockedSitesValue) {
+    return [...state.blockers.selectedSites];
+  }
+
+  return parseMultiValueList(rawValue).map(normalizeBlockedSite).filter(Boolean);
 }
 
 function formDataToObject(formData) {

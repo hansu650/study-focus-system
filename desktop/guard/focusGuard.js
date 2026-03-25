@@ -4,6 +4,42 @@ const { promisify } = require("node:util");
 
 const execFileAsync = promisify(execFile);
 const BROWSER_PROCESS_NAMES = new Set(["chrome", "msedge", "firefox", "brave", "opera", "iexplore"]);
+const IGNORED_PROCESS_NAMES = new Set([
+  "",
+  "applicationframehost",
+  "backgroundtaskhost",
+  "code",
+  "conhost",
+  "csrss",
+  "ctfmon",
+  "dllhost",
+  "dwm",
+  "electron",
+  "explorer",
+  "fontdrvhost",
+  "idle",
+  "lockapp",
+  "registry",
+  "runtimebroker",
+  "searchapp",
+  "searchhost",
+  "searchindexer",
+  "securityhealthsystray",
+  "services",
+  "shellexperiencehost",
+  "sihost",
+  "smartscreen",
+  "spoolsv",
+  "startmenuexperiencehost",
+  "svchost",
+  "system",
+  "taskhostw",
+  "textinputhost",
+  "widgetservice",
+  "widgets",
+  "windowsterminal",
+  "wpscloudsvr",
+]);
 
 function createFocusGuard({ emit = () => {} } = {}) {
   const state = {
@@ -179,9 +215,12 @@ function createFocusGuard({ emit = () => {} } = {}) {
 
   async function listProcessNames() {
     const script = [
+      "[Console]::InputEncoding = [System.Text.Encoding]::UTF8",
+      "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8",
+      "$OutputEncoding = [System.Text.Encoding]::UTF8",
       "$names = Get-Process | Select-Object -ExpandProperty ProcessName",
       "$names | ConvertTo-Json -Compress",
-    ].join("; ");
+    ].join("\n");
 
     const { stdout } = await execFileAsync(
       "powershell.exe",
@@ -196,10 +235,13 @@ function createFocusGuard({ emit = () => {} } = {}) {
 
   async function listBrowserWindows() {
     const script = [
+      "[Console]::InputEncoding = [System.Text.Encoding]::UTF8",
+      "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8",
+      "$OutputEncoding = [System.Text.Encoding]::UTF8",
       "$targets = @('chrome','msedge','firefox','brave','opera','iexplore')",
       "$items = Get-Process | Where-Object { $_.MainWindowTitle -and $targets -contains $_.ProcessName.ToLower() } | Select-Object @{Name='processName';Expression={$_.ProcessName}}, @{Name='windowTitle';Expression={$_.MainWindowTitle}}",
       "$items | ConvertTo-Json -Compress",
-    ].join("; ");
+    ].join("\n");
 
     const { stdout } = await execFileAsync(
       "powershell.exe",
@@ -215,6 +257,64 @@ function createFocusGuard({ emit = () => {} } = {}) {
         windowTitle: String(item.windowTitle || "").trim(),
       }))
       .filter((item) => item.processName && item.windowTitle && BROWSER_PROCESS_NAMES.has(item.processName));
+  }
+
+  async function listSelectableApps() {
+    if (!supportsProcessWatch()) {
+      return [];
+    }
+
+    const script = [
+      "[Console]::InputEncoding = [System.Text.Encoding]::UTF8",
+      "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8",
+      "$OutputEncoding = [System.Text.Encoding]::UTF8",
+      "$registryPaths = @(",
+      "  'HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',",
+      "  'HKLM:\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',",
+      "  'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*'",
+      ")",
+      "$installed = Get-ItemProperty $registryPaths -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -and $_.SystemComponent -ne 1 } | ForEach-Object {",
+      "  $icon = [string]$_.DisplayIcon",
+      "  $cleanIcon = ($icon -replace '\"','').Split(',')[0].Trim()",
+      "  $process = ''",
+      "  if ($cleanIcon -and $cleanIcon.ToLower().EndsWith('.exe')) {",
+      "    $process = [System.IO.Path]::GetFileNameWithoutExtension($cleanIcon)",
+      "  }",
+      "  if ($process) {",
+      "    [pscustomobject]@{ processName = $process.ToLower(); displayName = [string]$_.DisplayName; isRunning = $false }",
+      "  }",
+      "}",
+      "$running = Get-Process | Where-Object { $_.MainWindowTitle } | ForEach-Object {",
+      "  [pscustomobject]@{ processName = $_.ProcessName.ToLower(); displayName = $_.ProcessName; isRunning = $true }",
+      "}",
+      "$combined = @($running + $installed) | Where-Object { $_.processName } | Group-Object processName | ForEach-Object {",
+      "  $runningItem = $_.Group | Where-Object { $_.isRunning } | Select-Object -First 1",
+      "  $namedItem = $_.Group | Where-Object { $_.displayName -and $_.displayName.ToLower() -ne $_.processName.ToLower() } | Select-Object -First 1",
+      "  [pscustomobject]@{",
+      "    processName = $_.Name",
+      "    displayName = if ($namedItem) { $namedItem.displayName } else { $_.Name }",
+      "    isRunning = [bool]$runningItem",
+      "  }",
+      "} | Sort-Object @{Expression='isRunning';Descending=$true}, displayName, processName | Select-Object -First 240",
+      "$combined | ConvertTo-Json -Compress",
+    ].join("\n");
+
+    const { stdout } = await execFileAsync(
+      "powershell.exe",
+      ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+      { windowsHide: true, maxBuffer: 3 * 1024 * 1024 }
+    );
+
+    const parsed = safeParseJson(stdout.trim());
+    const items = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+
+    return items
+      .map((item) => ({
+        processName: normalizeAppName(item.processName),
+        displayName: String(item.displayName || item.processName || "").trim(),
+        isRunning: Boolean(item.isRunning),
+      }))
+      .filter((item) => item.processName && !IGNORED_PROCESS_NAMES.has(item.processName));
   }
 
   async function runSiteBlockScript(mode, domains) {
@@ -247,6 +347,7 @@ function createFocusGuard({ emit = () => {} } = {}) {
     start,
     stop,
     getStatus,
+    listSelectableApps,
   };
 }
 

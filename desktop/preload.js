@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld("studyFocusDesktop", {
   startGuard(payload) {
     return ipcRenderer.invoke("desktop:start-guard", payload);
   },
+  listBlockingApps() {
+    return ipcRenderer.invoke("desktop:list-blocking-apps");
+  },
   stopGuard() {
     return ipcRenderer.invoke("desktop:stop-guard");
   },
