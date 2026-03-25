@@ -98,6 +98,10 @@ function registerIpc() {
     return guard.start(payload, mainWindow);
   });
 
+  ipcMain.handle("desktop:list-blocking-apps", async () => {
+    return guard.listSelectableApps();
+  });
+
   ipcMain.handle("desktop:stop-guard", async () => {
     return guard.stop(mainWindow);
   });
